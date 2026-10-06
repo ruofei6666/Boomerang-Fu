@@ -1,0 +1,56 @@
+{
+  "game": "Strawberry Walk",
+  "engine": "Godot 4.7.2",
+  "files": [
+    {
+      "path": "index.html",
+      "bytes": 2527,
+      "sha256": "df6d0e303f1a511cc7a728c2d0efb68bf17398936d5d9f44683f5940ca2718f8"
+    },
+    {
+      "path": "index.js",
+      "bytes": 279850,
+      "sha256": "49e4c8182c9d38e96d98848dfd611708d2d13516d70bf1cae6bfdfad4707c90d"
+    },
+    {
+      "path": "index.wasm",
+      "bytes": 39514754,
+      "sha256": "fc74679e3b97f76878947fcd4fbe1268cbfa6188182a2e33bbc3f5dc9bfa57d0"
+    },
+    {
+      "path": "index.pck",
+      "bytes": 401152,
+      "sha256": "4bb91d17ba5bf0c138710a5a75cf71c0bbeed09f11fa2d654123374f9d8c7115"
+    },
+    {
+      "path": "index.png",
+      "bytes": 21443,
+      "sha256": "3cb4495c0b98dfbe4b663cbf2b6836473572339beb66d902367893162a70be0e"
+    },
+    {
+      "path": "index.audio.worklet.js",
+      "bytes": 7298,
+      "sha256": "5b476a9c9ce642c0ee4256436d1bc31d9c38f868aca0f9a8e2a57c18d2dec2a3"
+    },
+    {
+      "path": "index.audio.position.worklet.js",
+      "bytes": 2973,
+      "sha256": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8"
+    },
+    {
+      "path": "licenses/noto-sans-sc-OFL.txt",
+      "bytes": 4388,
+      "sha256": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9"
+    },
+    {
+      "path": "licenses/godot-license.txt",
+      "bytes": 1149,
+      "sha256": "b0435e3b3e4e55238f05f4b306f30524a1b2e20147810d436eaa554fa6855c80"
+    },
+    {
+      "path": "licenses/godot-copyright.txt",
+      "bytes": 100108,
+      "sha256": "cb1980c88089573bcacd7221d777c689bb8bbd778799f24c27fca0fe5f774d6d"
+    }
+  ]
+}

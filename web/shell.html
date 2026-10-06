@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#95c989">
+  <title>草莓散步 · Strawberry Walk</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #95c989; touch-action: none; overscroll-behavior: none; }
+    #canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+    #loading { position: fixed; inset: 0; display: grid; place-content: center; gap: 18px; text-align: center; color: #294533; font: 18px system-ui, sans-serif; background: #e6f3cd; }
+    #loading h1 { margin: 0; font-size: 28px; }
+    #loading p { margin: 0; font-size: 14px; }
+    #progress { width: 230px; accent-color: #ef5263; }
+    #error { max-width: 300px; line-height: 1.6; }
+  </style>
+  $GODOT_HEAD_INCLUDE
+</head>
+<body>
+  <canvas id="canvas" tabindex="0" aria-label="3D草莓散步游戏：电脑用WASD，手机拖动左下角摇杆"></canvas>
+  <div id="loading">
+    <h1>草莓散步</h1>
+    <p>正在准备小草莓…</p>
+    <progress id="progress"></progress>
+    <p>电脑 WASD · 手机左下角摇杆</p>
+    <p id="error" hidden></p>
+  </div>
+  <script src="$GODOT_URL"></script>
+  <script>
+    const engine = new Engine($GODOT_CONFIG);
+    const progress = document.getElementById('progress');
+    const canvas = document.getElementById('canvas');
+    document.addEventListener('touchmove', event => event.preventDefault(), { passive: false });
+    window.addEventListener('contextmenu', event => event.preventDefault());
+    engine.startGame({
+      args: window.isSecureContext ? [] : ['--audio-driver', 'ScriptProcessor'],
+      canvas,
+      onProgress(current, total) { progress.value = current; progress.max = total || 1; },
+    }).then(() => {
+      document.getElementById('loading').remove();
+      canvas.focus();
+    }).catch(error => {
+      const message = document.getElementById('error');
+      message.hidden = false;
+      message.textContent = '游戏加载失败，请尝试更新浏览器后重新打开。' + String(error);
+      console.error(error);
+    });
+  </script>
+</body>
+</html>

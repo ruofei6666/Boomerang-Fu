@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.ttf -text
+*.png -text
+*.wasm -text
+*.pck -text
+# Preserve the exact bytes of the tested Web export and its hash manifest.
+docs/** -text

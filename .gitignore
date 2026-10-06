@@ -1,0 +1,12 @@
+.godot/
+.firecrawl/
+artifacts/
+artifacts/*.log
+artifacts/verification.json
+*.tmp
+.venv/
+.cache/
+build/
+.env
+.env.*
+
