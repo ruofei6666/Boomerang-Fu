@@ -57,6 +57,8 @@ godot --path . -- --capture-ui
 
 Web 使用 Compatibility 渲染器和单线程模板，导出预设保存在 `export_presets.cfg`。没有模板时，可以运行 `python tools/fetch_web_template.py`，再运行同一命令并添加 `--template web_nothreads_debug.zip`；脚本从 Godot 官方发布包中仅下载所需的 Web 模板，验证 ZIP CRC。
 
+地图材质已按先前的浅绿地面、蓝紫岩石截图校准 Compatibility 的亮度，并关闭地图材质的镜面高光，避免网页版本过曝发白。角色材质和灯光保持原有设置。
+
 每次重新导出后运行 `node tools/patch_web_export.mjs`。它为 Godot 4.7.2 的 Web 音频初始化加上能力检查；HTML 启动页在 HTTP 局域网页面明确选择引擎的 ScriptProcessor 后备方式，HTTPS 页面保留 AudioWorklet。当前试玩没有音效资源。此兼容修改核对了官方源文件 `.firecrawl/godot-web-audio-js.md`、`.firecrawl/godot-web-audio-header.md`。
 
 Godot 输入和物理检查已通过 32 项。实际浏览器已验证局域网加载、摇杆移动、松手停止、回到起点和手机横竖屏布局。

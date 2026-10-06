@@ -15,7 +15,8 @@ ambient_light_energy = 0.62
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wh02c"]
 diffuse_mode = 1
-albedo_color = Color(0.59607846, 0.80784315, 0.5372549, 1)
+specular_mode = 2
+albedo_color = Color(0.42917649, 0.59780393, 0.38897255, 1)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_1rs0c"]
 size = Vector2(180, 180)
@@ -23,6 +24,8 @@ size = Vector2(180, 180)
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4llnp"]
 cull_mode = 2
 diffuse_mode = 1
+specular_mode = 2
+albedo_color = Color(0.7, 0.7, 0.716, 1)
 vertex_color_use_as_albedo = true
 vertex_color_is_srgb = true
 
@@ -802,14 +805,16 @@ points = PackedVector3Array(2.110259, 0, 0.118011594, 2.4537897, 0.38100645, 0.1
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yvcni"]
 diffuse_mode = 1
-albedo_color = Color(0.5294118, 0.5764706, 0.78039217, 1)
+specular_mode = 2
+albedo_color = Color(0.38117650, 0.42658824, 0.56500393, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_justw"]
 size = Vector3(0.6, 0.76, 17)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_55syn"]
 diffuse_mode = 1
-albedo_color = Color(0.627451, 0.6745098, 0.84313726, 1)
+specular_mode = 2
+albedo_color = Color(0.45176472, 0.49913725, 0.61043138, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_4m54k"]
 size = Vector3(0.64500004, 0.1, 17.04)

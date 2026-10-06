@@ -10,6 +10,10 @@ const GROUND_COLOR := Color("d4f887")
 const CAP_COLOR := Color("b5e89a")
 const ROCK_COLORS: Array[Color] = [Color("626ca5"), Color("7b85bd"), Color("929dce"), Color("8a96c9")]
 
+# Compatibility 的光照响应与 Forward+ 不同；以下材质补偿按旧版实际渲染画面校准。
+const VERTEX_PALETTE_TINT := Color(0.70, 0.70, 0.716, 1.0)
+const SOLID_PALETTE_TINT := Color(0.72, 0.74, 0.724, 1.0)
+
 var vertex_material: StandardMaterial3D
 var solid_materials: Dictionary = {}
 
@@ -18,6 +22,8 @@ func build_scene() -> Node3D:
 	vertex_material = StandardMaterial3D.new()
 	vertex_material.vertex_color_use_as_albedo = true
 	vertex_material.vertex_color_is_srgb = true
+	vertex_material.albedo_color = VERTEX_PALETTE_TINT
+	vertex_material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	vertex_material.roughness = 1.0
 	vertex_material.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT
 	vertex_material.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -366,7 +372,8 @@ func _material(color: Color) -> StandardMaterial3D:
 	if solid_materials.has(color):
 		return solid_materials[color] as StandardMaterial3D
 	var material := StandardMaterial3D.new()
-	material.albedo_color = color
+	material.albedo_color = color * SOLID_PALETTE_TINT
+	material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	material.roughness = 1.0
 	material.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT
 	solid_materials[color] = material
