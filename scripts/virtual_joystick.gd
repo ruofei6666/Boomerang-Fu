@@ -60,7 +60,8 @@ func _update_stick(screen_position: Vector2) -> void:
 	var local: Vector2 = get_global_transform_with_canvas().affine_inverse() * screen_position
 	knob_offset = (local - size * 0.5).limit_length(radius)
 	var amount: float = knob_offset.length() / radius
-	movement = Vector2.ZERO if amount <= dead_zone else knob_offset.normalized() * ((amount - dead_zone) / (1.0 - dead_zone))
+	# 推动幅度只影响摇杆显示；越过死区后始终输出满速方向。
+	movement = Vector2.ZERO if amount <= dead_zone else knob_offset.normalized()
 	queue_redraw()
 
 

@@ -121,6 +121,7 @@ func _process(delta: float) -> void:
 		"physics_frame": Engine.get_physics_frames(),
 		"position": [player.position.x, player.position.y, player.position.z],
 		"velocity": [player.velocity.x, player.velocity.z],
+		"walk_speed": player.walk_speed,
 		"feet": [player.left_foot.position.y, player.right_foot.position.y],
 		"joystick": [stick.movement.x, stick.movement.y],
 		"touch": stick.active_touch,

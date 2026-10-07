@@ -316,38 +316,14 @@ func _build_interface(arena: Node3D) -> void:
 	title.add_theme_color_override("font_color", Color("3a5948"))
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(title)
-	var hint_panel := PanelContainer.new()
-	hint_panel.name = "CameraHints"
-	hint_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	hint_panel.offset_left = 24.0
-	hint_panel.offset_right = 832.0
-	hint_panel.offset_top = -61.0
-	hint_panel.offset_bottom = -24.0
-	hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.16, 0.23, 0.22, 0.84)
-	style.set_corner_radius_all(9)
-	style.content_margin_left = 15.0
-	style.content_margin_right = 15.0
-	style.content_margin_top = 10.0
-	style.content_margin_bottom = 10.0
-	hint_panel.add_theme_stylebox_override("panel", style)
-	root.add_child(hint_panel)
-	var hints := Label.new()
-	hints.name = "Hints"
-	hints.text = "WASD / 方向键 移动    中键 / 右键 拖动    滚轮 缩放    Q / E 转向    R 复位    H 隐藏提示"
-	hints.add_theme_color_override("font_color", Color("e4f2d7"))
-	hints.add_theme_font_size_override("font_size", 13)
-	hints.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint_panel.add_child(hints)
 	var top_right := HBoxContainer.new()
 	top_right.name = "TopRight"
 	top_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_right.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	top_right.offset_left = -70.0
-	top_right.offset_right = -24.0
-	top_right.offset_top = 22.0
-	top_right.offset_bottom = 56.0
+	top_right.offset_left = -198.0
+	top_right.offset_right = -152.0
+	top_right.offset_top = 16.0
+	top_right.offset_bottom = 58.0
 	top_right.add_theme_constant_override("separation", 14)
 	root.add_child(top_right)
 	var zoom := Label.new()

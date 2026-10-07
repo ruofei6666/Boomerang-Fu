@@ -137,7 +137,8 @@ def main():
         phone.set_viewport_size({"width": 844, "height": 390})
         frames(phone, 36)
         landscape = state(phone)
-        phone.touchscreen.tap(844 - 78, 390 - 46)
+        rx, ry, rw, rh = landscape["match"]["controls"]["settings"]
+        phone.touchscreen.tap(rx + rw / 2, ry + rh / 2)
         frames(phone, 21)
         reset = state(phone)
         check(abs(reset["position"][0]) < 0.05 and abs(reset["position"][2] - 3) < 0.05, "Mobile return-to-start button resets the player")

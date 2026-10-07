@@ -108,7 +108,7 @@ func _layout_controls() -> void:
 	title.text = "水果乱斗" if mobile else "水果乱斗  /  BOOMERANG ARENA"
 	title.position = Vector2(20.0, 18.0) * unit
 	title.add_theme_font_size_override("font_size", roundi((19.0 if mobile else 17.0) * unit))
-	roles_label.position = Vector2(20.0, 51.0) * unit
+	roles_label.position = Vector2(20.0, 68.0 if pixels.x < 360.0 else 51.0) * unit
 	roles_label.add_theme_font_size_override("font_size", roundi((11.0 if mobile else 13.0) * unit))
 	var top: HBoxContainer = $Root/TopRight
 	zoom_label.visible = not mobile
@@ -116,23 +116,17 @@ func _layout_controls() -> void:
 	zoom_label.add_theme_font_size_override("font_size", roundi(14.0 * unit))
 	top.add_theme_constant_override("separation", roundi(14.0 * unit))
 	respawn_button.add_theme_font_size_override("font_size", roundi(15.0 * unit))
-	var panel: PanelContainer = $Root/CameraHints
-	var hints: Label = $Root/CameraHints/Hints
-	hints.text = "摇杆走动 · 右侧砍 / 跳" if mobile else "WASD / 方向键 走动   ·   J 跳斩   ·   K 跳跃   ·   滚轮缩放   ·   Q / E 转镜头"
-	hints.add_theme_font_size_override("font_size", roundi(12.0 * unit))
 	# 先更新字体和最小尺寸，再调整容器，横竖屏切换不会保留旧的高度。
 	top.size = Vector2(46.0, 42.0) * unit
-	top.position = Vector2(logical.x - 66.0 * unit, 16.0 * unit)
+	top.position = Vector2(logical.x - 198.0 * unit, 16.0 * unit)
 	respawn_button.size = Vector2(116.0, 44.0) * unit
-	respawn_button.position = Vector2(logical.x - 136.0 * unit, logical.y - 68.0 * unit)
+	respawn_button.position = Vector2(logical.x - 136.0 * unit, 16.0 * unit)
 	var attack_size: float = (100.0 if mobile else 106.0) * unit
 	melee_button.size = Vector2.ONE * attack_size
-	melee_button.position = Vector2(logical.x - attack_size - 26.0 * unit, logical.y - attack_size - 94.0 * unit)
+	melee_button.position = Vector2(logical.x - attack_size - 26.0 * unit, logical.y - attack_size - 24.0 * unit)
 	jump_button.size = Vector2.ONE * attack_size
 	# 窄屏上下排列，避免跳跃图标与左下角摇杆的触控区域重叠。
 	jump_button.position = melee_button.position - (Vector2(0.0, attack_size + 14.0 * unit) if pixels.x < 560.0 else Vector2(attack_size + 14.0 * unit, 0.0))
-	panel.size = Vector2((210.0 if mobile else 670.0) * unit, 36.0 * unit)
-	panel.position = Vector2(20.0 * unit, logical.y - (stick_size + 78.0 * unit))
 	_layout_menus(pixels, logical, unit)
 
 
@@ -441,7 +435,7 @@ func _refresh_phase() -> void:
 	show()
 	var phase: String = match_controller.phase
 	var playing: bool = phase in ["playing", "practice"]
-	for control in [$Root/MapTitle, $Root/TopRight, $Root/CameraHints, roles_label, joystick, melee_button, jump_button, respawn_button]:
+	for control in [$Root/MapTitle, $Root/TopRight, roles_label, joystick, melee_button, jump_button, respawn_button]:
 		control.visible = playing
 	overlay.visible = not playing
 	lobby_panel.visible = phase == "lobby"
@@ -566,7 +560,7 @@ func verification_state() -> Dictionary:
 		var actor: CharacterBody3D = get_parent().combat.actors[index]
 		actors.append({"seat": index, "role": actor.get_meta("role", index), "alive": actor.alive, "position": [actor.position.x, actor.position.y, actor.position.z], "attack_state": actor.attack_state, "round_active": actor.round_active})
 	return {"phase": match_controller.phase, "bot_count": match_controller.bot_count, "difficulty": match_controller.difficulty, "roles": match_controller.role_choices, "scores": match_controller.scores, "round": match_controller.round_number, "winner": match_controller.round_winner, "champion": match_controller.champion, "survivor_time": match_controller.survivor_time, "actors": actors,
-		"controls": {"minus": _screen_rect(minus_button, ratio), "plus": _screen_rect(plus_button, ratio), "difficulty": _screen_rect(difficulty_choice, ratio), "roles": selectors, "start": _screen_rect(start_button, ratio), "next": _screen_rect(next_button, ratio), "lobby": _screen_rect(lobby_button, ratio), "panel": _screen_rect(lobby_panel if match_controller.phase == "lobby" else score_panel, ratio), "participants": _screen_rect(participants_scroll, ratio), "scores_scroll": _screen_rect(scores_scroll, ratio), "popup": _popup_state(ratio)}, "title": score_title.text, "result": score_result.text}
+		"controls": {"minus": _screen_rect(minus_button, ratio), "plus": _screen_rect(plus_button, ratio), "difficulty": _screen_rect(difficulty_choice, ratio), "roles": selectors, "start": _screen_rect(start_button, ratio), "next": _screen_rect(next_button, ratio), "lobby": _screen_rect(lobby_button, ratio), "settings": _screen_rect(respawn_button, ratio), "joystick": _screen_rect(joystick, ratio), "attack": _screen_rect(melee_button, ratio), "jump": _screen_rect(jump_button, ratio), "panel": _screen_rect(lobby_panel if match_controller.phase == "lobby" else score_panel, ratio), "participants": _screen_rect(participants_scroll, ratio), "scores_scroll": _screen_rect(scores_scroll, ratio), "popup": _popup_state(ratio)}, "title": score_title.text, "result": score_result.text}
 
 
 func _popup_state(ratio: Vector2) -> Dictionary:
