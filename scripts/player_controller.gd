@@ -87,7 +87,14 @@ func movement_input() -> Vector2:
 	var touch := Vector2.ZERO
 	if is_instance_valid(joystick):
 		touch = joystick.movement
-	return (keyboard + touch).limit_length()
+	return (keyboard + touch).normalized()
+
+
+func walking_velocity(direction: Vector3, delta: float) -> Vector2:
+	if is_instance_valid(joystick) and not joystick.movement.is_zero_approx():
+		# 摇杆起步和换向直接采用满速，不经过键盘的加速过渡。
+		return Vector2(direction.x, direction.z) * walk_speed
+	return super.walking_velocity(direction, delta)
 
 
 func movement_direction(_delta: float) -> Vector3:

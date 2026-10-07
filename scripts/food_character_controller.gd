@@ -62,6 +62,11 @@ func movement_direction(_delta: float) -> Vector3:
 	return Vector3.ZERO
 
 
+func walking_velocity(direction: Vector3, delta: float) -> Vector2:
+	var rate: float = braking if direction.is_zero_approx() else acceleration
+	return Vector2(velocity.x, velocity.z).move_toward(Vector2(direction.x, direction.z) * walk_speed, rate * delta)
+
+
 func _physics_process(delta: float) -> void:
 	if not round_active or not alive:
 		velocity = Vector3.ZERO
@@ -70,9 +75,7 @@ func _physics_process(delta: float) -> void:
 		_process_attack(delta)
 		return
 	var direction: Vector3 = movement_direction(delta)
-	var target: Vector3 = direction * walk_speed
-	var rate: float = braking if direction.is_zero_approx() else acceleration
-	var horizontal := Vector2(velocity.x, velocity.z).move_toward(Vector2(target.x, target.z), rate * delta)
+	var horizontal: Vector2 = walking_velocity(direction, delta)
 	velocity.x = horizontal.x
 	velocity.z = horizontal.y
 	if is_on_floor():
