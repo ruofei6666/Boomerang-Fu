@@ -19,9 +19,10 @@ def main():
     base = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/"
     if not source.exists():
         urllib.request.urlretrieve(base + "NotoSansSC%5Bwght%5D.ttf", source)
-    urllib.request.urlretrieve(base + "OFL.txt", DESTINATION / "OFL.txt")
+    if not (DESTINATION / "OFL.txt").exists():
+        urllib.request.urlretrieve(base + "OFL.txt", DESTINATION / "OFL.txt")
     characters = "".join(chr(code) for code in range(32, 127))
-    for file in [ROOT / "scripts" / "interface.gd", ROOT / "project.godot", ROOT / "tools" / "map_builder.gd"]:
+    for file in [*sorted((ROOT / "scripts").glob("*.gd")), ROOT / "project.godot", ROOT / "tools" / "map_builder.gd"]:
         characters += file.read_text(encoding="utf-8")
     font = TTFont(source)
     if "fvar" in font:

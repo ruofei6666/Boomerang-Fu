@@ -2,6 +2,7 @@ extends SceneTree
 ## 保存真实 3D 草莓网格、叶冠、立体五官、两颗独立圆球脚和碰撞体。
 
 const PLAYER_SCRIPT = preload("res://scripts/player_controller.gd")
+const HELD_BOOMERANG_BUILDER = preload("res://tools/held_boomerang_builder.gd")
 const SEGMENTS: int = 48
 const RINGS: int = 32
 
@@ -38,6 +39,7 @@ func _initialize() -> void:
 	_build_face(berry)
 	_build_seeds(berry)
 	_build_leaves(berry)
+	HELD_BOOMERANG_BUILDER.new().attach(berry, "strawberry")
 	_set_owner(player, player)
 	var packed := PackedScene.new()
 	var result: Error = packed.pack(player)

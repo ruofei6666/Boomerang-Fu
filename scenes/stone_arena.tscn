@@ -5,6 +5,9 @@
 [ext_resource type="Script" path="res://scripts/interface.gd" id="3_sovpm"]
 
 [ext_resource type="PackedScene" path="res://scenes/strawberry_player.tscn" id="4_strawberry"]
+[ext_resource type="PackedScene" path="res://scenes/eggplant_npc.tscn" id="5_eggplant"]
+[ext_resource type="PackedScene" path="res://scenes/donut_npc.tscn" id="6_donut"]
+[ext_resource type="PackedScene" path="res://scenes/carrot_npc.tscn" id="7_carrot"]
 
 [sub_resource type="Environment" id="Environment_wtpdb"]
 background_mode = 1
@@ -1609,7 +1612,7 @@ script = ExtResource("2_fbquj")
 transform = Transform3D(0.9902681, -0.11114859, 0.08375646, 0, 0.60181504, 0.79863554, -0.1391731, -0.79086334, 0.5959582, 3.7690408, 35.9386, 26.818117)
 projection = 1
 current = true
-size = 24.0
+size = 32.520325
 near = 0.1
 far = 180.0
 
@@ -1681,3 +1684,15 @@ text = "复位视角  R"
 
 [node name="StrawberryPlayer" parent="." instance=ExtResource("4_strawberry")]
 position = Vector3(0, 0.08, 3)
+
+[node name="EggplantNPC" parent="." instance=ExtResource("5_eggplant")]
+position = Vector3(-2.9, 0.08, 1.25)
+spawn_position = Vector3(-2.9, 0.08, 1.25)
+
+[node name="DonutNPC" parent="." instance=ExtResource("6_donut")]
+position = Vector3(2.75, 0.08, 4.4)
+spawn_position = Vector3(2.75, 0.08, 4.4)
+
+[node name="CarrotNPC" parent="." instance=ExtResource("7_carrot")]
+position = Vector3(0.75, 0.08, -0.55)
+spawn_position = Vector3(0.75, 0.08, -0.55)

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#95c989">
-  <title>草莓散步 · Strawberry Walk</title>
+  <title>水果乱斗 · Boomerang Arena</title>
   <link rel="icon" href="data:,">
   <style>
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #95c989; touch-action: none; overscroll-behavior: none; }
@@ -18,17 +18,17 @@
   
 </head>
 <body>
-  <canvas id="canvas" tabindex="0" aria-label="3D草莓散步游戏：电脑用WASD，手机拖动左下角摇杆"></canvas>
+  <canvas id="canvas" tabindex="0" aria-label="3D水果乱斗：设置人机与角色后开始；WASD走动、J跳斩、K跳跃，手机使用摇杆和动作图标；先到10分获胜"></canvas>
   <div id="loading">
-    <h1>草莓散步</h1>
-    <p>正在准备小草莓…</p>
+    <h1>水果乱斗</h1>
+    <p>正在准备食物角色和岩石庭院…</p>
     <progress id="progress"></progress>
-    <p>电脑 WASD · 手机左下角摇杆</p>
+    <p>选择角色与人机 · 每局最后存活者得分 · 先到 10 分获胜</p>
     <p id="error" hidden></p>
   </div>
   <script src="index.js"></script>
   <script>
-    const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":401216,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
+    const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":912584,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
     const progress = document.getElementById('progress');
     const canvas = document.getElementById('canvas');
     document.addEventListener('touchmove', event => event.preventDefault(), { passive: false });

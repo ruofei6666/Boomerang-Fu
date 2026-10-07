@@ -1,0 +1,58 @@
+{
+  "url": "https://www.bilibili.com/video/BV1LP411A7oK/",
+  "clips": [
+    {
+      "event": "slash",
+      "start": 20.49,
+      "end": 20.72
+    },
+    {
+      "event": "clash",
+      "start": 24.64,
+      "end": 25.43,
+      "duration": 0.79,
+      "channels": 2,
+      "sample_rate": 48000,
+      "user_preview_anchor_seconds": 0,
+      "selection": "User identified clash at start and fruit slice near 1s of original 25-28s preview; start aligned to transient and matching game frames.",
+      "processing": "Original stereo; no center subtraction or EQ; constant gain for 0.82 peak; 2ms fade-in and 12ms fade-out.",
+      "gain_db": -1.057
+    },
+    {
+      "event": "slice",
+      "start": 25.82,
+      "end": 26.085,
+      "duration": 0.2650208333333333,
+      "channels": 2,
+      "sample_rate": 48000,
+      "user_preview_anchor_seconds": 1,
+      "selection": "User requested only the second sound of the vocal-separated slice preview; first transient removed, second begins near 25.82s.",
+      "processing": "Local MDX vocal separation with stereo retained; constant gain for 0.82 peak; 2ms fade-in and 12ms fade-out; resampled 44100 to 48000Hz.",
+      "gain_db": 8.71,
+      "separation": {
+        "model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+        "model_hash_uvr": "55657dd70583b0fedfba5f67df11d711",
+        "config": {
+          "compensate": 1.022,
+          "mdx_dim_f_set": 3072,
+          "mdx_dim_t_set": 8,
+          "mdx_n_fft_scale_set": 6144,
+          "primary_stem": "Instrumental"
+        },
+        "context_start": 22.0,
+        "context_end": 29.5,
+        "sample_rate": 44100,
+        "round_trip_max_error": 4.470348358154297e-08,
+        "implementation": "UVR ONNX layout with NumPy STFT, 50 percent overlap, two-polarity denoise",
+        "model_url": "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/UVR-MDX-NET-Inst_HQ_3.onnx",
+        "implementation_reference": "https://github.com/Anjok07/ultimatevocalremovergui/blob/master/separate.py"
+      },
+      "preview_file": "audio-clips/BV1LP411A7oK_slice-second-only.mp3"
+    }
+  ],
+  "reference_preview": {
+    "start": 25.0,
+    "end": 28.0,
+    "file": "audio-clips/BV1LP411A7oK_original-25-28.mp3"
+  }
+}

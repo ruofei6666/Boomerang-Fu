@@ -43,6 +43,6 @@ for (const [source, name] of sources) {
 fs.writeFileSync(path.join(output, '.nojekyll'), '');
 fs.writeFileSync(path.join(output, '.gdignore'), '');
 fs.writeFileSync(path.join(output, 'build-manifest.json'), JSON.stringify({
-  game: 'Strawberry Walk', engine: 'Godot 4.7.2', files,
+  game: 'Boomerang Arena', engine: 'Godot 4.7.2', files,
 }, null, 2) + '\n');
 console.log(`PAGES_READY: ${files.length} files, ${files.reduce((sum, file) => sum + file.bytes, 0)} bytes`);

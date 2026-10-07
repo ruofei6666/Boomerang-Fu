@@ -6,7 +6,11 @@ artifacts/verification.json
 *.tmp
 .venv/
 .cache/
+.scratch/
+audio-clips/
 build/
 .env
 .env.*
+__pycache__/
+*.py[cod]
 

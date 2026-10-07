@@ -14,6 +14,7 @@ ARTIFACTS = ROOT / "artifacts"
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default="http://localhost:8060")
+    parser.add_argument("--software-rendering", action="store_true", help="Use SwiftShader when headless hardware WebGL is unavailable")
     args = parser.parse_args()
     checks = []
     console_errors = []
@@ -26,46 +27,64 @@ def main():
     def state(page):
         return page.evaluate("JSON.parse(document.getElementById('canvas').getAttribute('data-game-state') || 'null')")
 
+    def frames(page, count):
+        # SwiftShader may render slowly. Wait for actual physics frames rather than
+        # assuming that a fixed wall-clock delay means the game processed input.
+        target = state(page)["physics_frame"] + count
+        page.wait_for_function("target => JSON.parse(document.getElementById('canvas').getAttribute('data-game-state')).physics_frame >= target", arg=target, timeout=20000)
+
     def load(page):
         page.on("pageerror", lambda error: console_errors.append(str(error)))
         page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
-        page.goto(args.url + "/?verify=1")
+        page.goto(args.url + "/?verify=1&movement_only=1")
         page.wait_for_load_state("networkidle")
         page.wait_for_function("document.getElementById('canvas').hasAttribute('data-game-state') || (document.getElementById('error') && !document.getElementById('error').hidden)", timeout=30000)
         if not state(page):
             raise RuntimeError(page.locator("body").inner_text() + "\n" + "\n".join(console_errors))
-        page.wait_for_timeout(300)
+        frames(page, 18)
 
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(channel="msedge", headless=True, args=["--autoplay-policy=no-user-gesture-required"])
+        browser_args = ["--autoplay-policy=no-user-gesture-required"]
+        if args.software_rendering:
+            browser_args += ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
+        browser = playwright.chromium.launch(channel="msedge", headless=True, args=browser_args)
         desktop = browser.new_context(viewport={"width": 1440, "height": 810})
         page = desktop.new_page()
         load(page)
         check(page.locator("#loading").count() == 0, "Browser game finishes loading")
+        first = state(page)
+        check({actor["name"] for actor in first["wanderers"]} == {"EggplantNPC", "DonutNPC", "CarrotNPC"}, "Web build contains all three food NPCs")
+        frames(page, 240)
+        wandered = state(page)
+        for initial, actor in zip(first["wanderers"], wandered["wanderers"]):
+            distance = math.hypot(actor["position"][0] - initial["position"][0], actor["position"][2] - initial["position"][2])
+            check(distance > 0.2, actor["name"] + " wanders in the browser without input")
+        check(abs(wandered["position"][0] - first["position"][0]) < 0.05 and abs(wandered["position"][2] - first["position"][2]) < 0.05, "Browser strawberry waits for player input")
         start = state(page)
         page.keyboard.down("d")
-        page.wait_for_timeout(650)
+        frames(page, 39)
         moving = state(page)
         page.keyboard.up("d")
-        page.wait_for_timeout(250)
+        frames(page, 18)
         stopped = state(page)
+        snapshots["keyboard"] = {"start": start, "moving": moving, "stopped": stopped}
         check(moving["position"][0] > start["position"][0] + 2.0, "Desktop D moves the 3D strawberry")
         check(math.hypot(*stopped["velocity"]) < 0.02, "Desktop releasing D stops movement")
         check(moving["camera"][0] > start["camera"][0] + 1.0, "Browser camera follows the strawberry")
         before = state(page)
         page.keyboard.down("w")
-        page.wait_for_timeout(500)
+        frames(page, 30)
         page.keyboard.up("w")
-        page.wait_for_timeout(200)
+        frames(page, 12)
         check(state(page)["position"][2] < before["position"][2] - 1.3, "Desktop W moves forward")
         page.keyboard.down("a")
-        page.wait_for_timeout(250)
+        frames(page, 18)
         page.evaluate("window.dispatchEvent(new Event('blur'))")
-        page.wait_for_timeout(300)
+        frames(page, 18)
         check(math.hypot(*state(page)["velocity"]) < 0.02, "Browser losing focus stops keyboard movement")
         page.keyboard.up("a")
         page.evaluate("window.dispatchEvent(new Event('focus'))")
-        page.wait_for_timeout(200)
+        frames(page, 12)
         page.screenshot(path=str(ARTIFACTS / "strawberry_browser_desktop.png"))
         snapshots["desktop"] = state(page)
         desktop.close()
@@ -89,37 +108,37 @@ def main():
 
         touches("touchStart", [(10, x, y)])
         touches("touchMove", [(10, x + radius * 0.82, y)])
-        phone.wait_for_timeout(650)
+        frames(phone, 39)
         moved = state(phone)
         check(moved["joystick"][0] > 0.65 and moved["position"][0] > first["position"][0] + 1.5, "Portrait touch joystick moves the actual 3D player")
         check(abs(moved["feet"][0] - moved["feet"][1]) > 0.005, "Ball feet animate in the mobile Web build")
         touches("touchStart", [(10, x + radius * 0.82, y), (11, 250, 170)])
         touches("touchMove", [(10, x + radius * 0.82, y), (11, 210, 200)])
-        phone.wait_for_timeout(180)
+        frames(phone, 12)
         check(state(phone)["joystick"][0] > 0.65, "Second touch does not steal the browser joystick")
         # CDP touchEnd ends all contacts; reducing touchMove's active list releases only finger 11.
         touches("touchMove", [(10, x + radius * 0.82, y)])
-        phone.wait_for_timeout(150)
+        frames(phone, 9)
         check(state(phone)["joystick"][0] > 0.65, "Releasing another finger keeps the joystick active")
         touches("touchMove", [(10, x + radius * 4, y - radius * 4)])
-        phone.wait_for_timeout(150)
+        frames(phone, 9)
         check(abs(math.hypot(*state(phone)["joystick"]) - 1) < 0.02, "Browser diagonal joystick speed is bounded")
         touches("touchEnd", [])
-        phone.wait_for_timeout(400)
+        frames(phone, 24)
         released = state(phone)
         check(math.hypot(*released["velocity"]) < 0.02 and math.hypot(*released["joystick"]) < 0.01, "Releasing outside the joystick stops the browser player")
         touches("touchStart", [(12, x + radius * 0.7, y)])
-        phone.wait_for_timeout(150)
+        frames(phone, 9)
         touches("touchCancel", [])
-        phone.wait_for_timeout(400)
+        frames(phone, 24)
         check(math.hypot(*state(phone)["joystick"]) < 0.01 and math.hypot(*state(phone)["velocity"]) < 0.02, "Browser touch cancellation stops movement")
         snapshots["portrait"] = state(phone)
 
         phone.set_viewport_size({"width": 844, "height": 390})
-        phone.wait_for_timeout(600)
+        frames(phone, 36)
         landscape = state(phone)
-        phone.tap(844 - 78, 390 - 46)
-        phone.wait_for_timeout(350)
+        phone.touchscreen.tap(844 - 78, 390 - 46)
+        frames(phone, 21)
         reset = state(phone)
         check(abs(reset["position"][0]) < 0.05 and abs(reset["position"][2] - 3) < 0.05, "Mobile return-to-start button resets the player")
         landscape = reset
@@ -129,9 +148,9 @@ def main():
         before = landscape["position"]
         touches("touchStart", [(13, x, y)])
         touches("touchMove", [(13, x, y - radius * 0.9)])
-        phone.wait_for_timeout(600)
+        frames(phone, 36)
         touches("touchEnd", [])
-        phone.wait_for_timeout(300)
+        frames(phone, 18)
         check(state(phone)["position"][2] < before[2] - 1.4, "Landscape touch joystick moves the strawberry")
         phone.screenshot(path=str(ARTIFACTS / "strawberry_browser_landscape.png"))
         snapshots["landscape"] = state(phone)

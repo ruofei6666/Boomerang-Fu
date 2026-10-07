@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="草莓散步 · Strawberry Walk"
-config/description="Q版3D草莓在岩石庭院里散步：电脑WASD、手机触屏摇杆。"
+config/name="水果乱斗 · Boomerang Arena"
+config/description="选择自己与人机的食物角色，调整人机数量和简单、普通、困难三档难度；每局最后存活者保持1秒后得1分，全灭不加分，先到10分获胜。支持键盘、手机摇杆、跳斩和跳跃。"
 run/main_scene="res://scenes/stone_arena.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 

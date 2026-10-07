@@ -1,9 +1,10 @@
 extends Node3D
 ## 固定俯视倾角的正交相机。平移始终按屏幕方向计算。
 
-@export var initial_size: float = 16.0
+@export var initial_size: float = 40.0 / 1.23
+@export var overview_width: float = 50.0 / 1.23
 @export var min_size: float = 11.0
-@export var max_size: float = 43.0
+@export var max_size: float = 72.0
 @export var move_speed: float = 12.0
 @export var inclination_degrees: float = 48.0
 @export var initial_yaw_degrees: float = 8.0
@@ -12,7 +13,7 @@ extends Node3D
 @onready var camera: Camera3D = $Camera3D
 
 var desired_center := Vector3(0.0, 0.0, 0.7)
-var desired_size: float = 24.0
+var desired_size: float = 40.0 / 1.23
 var yaw: float = 0.0
 var dragging: bool = false
 var drag_button: int = MOUSE_BUTTON_NONE
@@ -25,8 +26,9 @@ func _ready() -> void:
 	desired_size = initial_size
 	yaw = deg_to_rad(initial_yaw_degrees)
 	position = desired_center
-	camera.size = initial_size
+	camera.size = view_size(initial_size)
 	_apply_orientation()
+	get_viewport().size_changed.connect(_resize_view)
 	hud = get_parent().get_node_or_null("Interface") as CanvasLayer
 
 
@@ -39,7 +41,7 @@ func _process(delta: float) -> void:
 	_clamp_center()
 	var smoothing: float = 1.0 - exp(-14.0 * delta)
 	position = position.lerp(desired_center, smoothing)
-	camera.size = lerpf(camera.size, desired_size, smoothing)
+	camera.size = lerpf(camera.size, view_size(desired_size), smoothing)
 	_apply_orientation()
 
 
@@ -83,7 +85,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if key.physical_keycode == KEY_R or key.keycode == KEY_R:
 			reset_view()
 		elif key.physical_keycode == KEY_H or key.keycode == KEY_H:
-			if hud:
+			var match_controller: Node = get_parent().get_node_or_null("Match")
+			if hud and (match_controller == null or match_controller.phase in ["playing", "practice"]):
 				hud.visible = not hud.visible
 		elif key.keycode == KEY_F11:
 			var fullscreen: bool = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
@@ -121,15 +124,27 @@ func ground_position(screen_position: Vector2) -> Vector3:
 	return hit as Vector3 if hit != null else position
 
 
+func view_size(zoom_size: float) -> float:
+	# 竖屏保留与横屏相近的地图覆盖范围。
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var aspect: float = viewport_size.x / maxf(viewport_size.y, 1.0)
+	return zoom_size * maxf(1.0, overview_width / initial_size / maxf(aspect, 0.01))
+
+
+func _resize_view() -> void:
+	camera.size = view_size(desired_size)
+
+
 func zoom_at(screen_position: Vector2, factor: float) -> void:
 	# 同时平移相机，让鼠标指向的地面在缩放时留在同一位置。
 	var before: Vector3 = ground_position(screen_position)
 	var previous_size: float = camera.size
 	var previous_position: Vector3 = position
 	position = desired_center
-	camera.size = clampf(desired_size * factor, min_size, max_size)
+	var next_size: float = clampf(desired_size * factor, min_size, max_size)
+	camera.size = view_size(next_size)
 	var after: Vector3 = ground_position(screen_position)
-	desired_size = camera.size
+	desired_size = next_size
 	camera.size = previous_size
 	position = previous_position
 	desired_center += before - after

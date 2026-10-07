@@ -1,11 +1,11 @@
 {
-  "game": "Strawberry Walk",
+  "game": "Boomerang Arena",
   "engine": "Godot 4.7.2",
   "files": [
     {
       "path": "index.html",
-      "bytes": 2527,
-      "sha256": "9a288c4f61af2c832656db28092260ed7e6f2c6ef880dc1e597a07f765540393"
+      "bytes": 2654,
+      "sha256": "de37b554e0f71bec5e5c4e1b019b3337c99c1bbad30a306c6cb245a3ac7724ea"
     },
     {
       "path": "index.js",
@@ -19,8 +19,8 @@
     },
     {
       "path": "index.pck",
-      "bytes": 401216,
-      "sha256": "3b34afef4ef3ab269eab6bdbcfe406f64c09c7761758a34ad2c59513c5c669ea"
+      "bytes": 912584,
+      "sha256": "c7c453d9cd56ba16efa37e11a40176b66e7c262ec9582f2e646ce88b136dfbdf"
     },
     {
       "path": "index.png",
