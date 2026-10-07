@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const directory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../build/web');
 const portIndex = process.argv.indexOf('--port');
 const port = portIndex >= 0 ? Number(process.argv[portIndex + 1]) : 8060;
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.wasm': 'application/wasm', '.pck': 'application/octet-stream', '.png': 'image/png', '.json': 'application/json' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.pck': 'application/octet-stream', '.png': 'image/png', '.json': 'application/json' };
 
 if (!fs.existsSync(path.join(directory, 'index.html'))) {
   throw new Error('Export the Web preset from Godot before starting the server.');

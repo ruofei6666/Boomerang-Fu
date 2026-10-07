@@ -40,6 +40,8 @@ def main():
         page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
         page.add_init_script(AUDIO_PROBE)
         page.goto(args.url.rstrip("/") + "/?verify=1&input_only=1", wait_until="networkidle", timeout=60000)
+        if page.locator("#pwa-dialog").evaluate("dialog => dialog.open"):
+            page.locator("#pwa-continue").click()
         wait(page, "s.throw_id !== undefined && s.throw_button !== undefined && s.projectiles !== undefined")
         return page
 

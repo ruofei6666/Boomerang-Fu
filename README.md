@@ -19,6 +19,19 @@ Godot 4.7.2 的 3D 食物角色乱斗游戏。进入游戏先设置 1–5 个人
 
 [在线试玩（GitHub Pages）](https://ruofei6666.github.io/Boomerang-Fu/)。电脑用 WASD / 方向键，手机用左下角摇杆；在线版无需电脑保持开机。
 
+### 手机安装、离线玩和更新
+
+普通手机浏览器进入时会显示安装教程；从已安装的 App 进入时跳过。右上角「安装 / 离线」可以随时重新打开教程，打开时整场比赛暂停，关闭后继续。
+
+- **安卓**：用 Chrome 打开 HTTPS 游戏网址 → 右上角「⋮」→「安装应用」，或「安装并创建快捷方式 → 安装」→ 回到桌面点击「水果乱斗」。
+- **iPhone / iPad**：用 Safari 打开 →「共享」→「添加到主屏幕」→ 如果出现「作为网页 App 打开」，保持开启 →「添加」→ 从桌面图标进入。系统状态栏和手势条可能仍保留。
+- **离线玩**：第一次保持联网，等教程里的状态显示「离线可玩」。完整包约 40 MB，包含引擎、角色、地图、音效和教程。从桌面 App 进入后也确认一次此状态，再断网即可与人机对战。清理网站数据或系统回收缓存后需重新下载；「检查更新」会补齐缺失资源。
+- **更新**：联网打开、恢复联网或从后台返回会检查新版本，也可点「检查更新」。新版完整下载后入口显示「有新版本」；点击「更新并重开」才重新加载，当前比赛分数会清零。点「稍后」继续比赛；下载失败保留旧版离线包。
+
+安装与离线缓存需要 **HTTPS**（本机 localhost 也可测试）。普通 `http://192.168.x.x:8060` 局域网地址仍可在线试玩，但不能安装离线 App。微信 / QQ 内请先选择在浏览器中打开。
+
+教程步骤参考 [Chrome 官方指引](https://support.google.com/chrome/answer/9658361?hl=zh-Hans&co=GENIE.Platform%3DAndroid) 和 [Apple 官方指引](https://support.apple.com/zh-cn/guide/iphone/iphea86e5236/ios)。
+
 电脑双击 `run-map.cmd` 打开原生游戏，先设置参赛角色并点击开始，再使用 **WASD / 方向键** 控制自己的角色。
 
 双击 `run-web.cmd` 启动浏览器版本，也可以打开 <http://localhost:8060>。手机与电脑连接同一 Wi-Fi 后，在手机浏览器打开电脑 Wi-Fi 地址的 8060 端口，例如 <http://192.168.0.197:8060>。Wi-Fi 地址可能变化；电脑必须保持开机，试玩服务必须运行。
@@ -110,6 +123,7 @@ godot --headless --path . --fixed-fps 60 --script res://tools/verify_throw.gd
 godot --headless --path . --export-release Web build/web/index.html
 node tools/patch_web_export.mjs
 node tools/prepare_pages.mjs
+.venv\Scripts\python.exe tools\verify_pwa_browser.py --software-rendering
 .venv\Scripts\python.exe tools\verify_match_browser.py --software-rendering
 python tools/verify_throw_browser.py --software-rendering
 godot --path . -- --capture-ui
@@ -121,6 +135,10 @@ Web 使用 Compatibility 渲染器和单线程模板，导出预设保存在 `ex
 地图材质已按先前的浅绿地面、蓝紫岩石截图校准 Compatibility 的亮度，并关闭地图材质的镜面高光，避免网页版本过曝发白。角色材质和灯光保持原有设置。
 
 每次重新导出后运行 `node tools/patch_web_export.mjs`。它为 Godot 4.7.2 的 Web 音频初始化加上能力检查；HTML 启动页在 HTTP 局域网页面明确选择引擎的 ScriptProcessor 后备方式，HTTPS 页面保留 AudioWorklet。三种短 WAV 音效会随场景一起打包。此兼容修改核对了官方源文件 `.firecrawl/godot-web-audio-js.md`、`.firecrawl/godot-web-audio-header.md`。
+
+该补丁同时运行 `tools/prepare_web_pwa.mjs`，复制 `web/` 的教程、安装清单和图标，并生成带内容版本及完整 SHA-256 资源清单的 `sw.js`；`prepare_pages.mjs` 将这些文件一并打包到 `docs/`。自定义 worker 会核对每个下载文件，完整成功才启用新版，并只清理本游戏当前路径下的旧缓存，保护同域其他游戏。Godot 自带的自动 PWA 导出保持关闭，以免与此 worker 冲突。图标来源为已有 `assets/icons/ios.png`；需要重做尺寸时运行 `godot --headless --path . --script res://tools/prepare_pwa_icons.gd`。
+
+PWA 检查运行 `.venv\Scripts\python.exe tools\verify_pwa_browser.py --software-rendering`，在独立浏览器数据目录和仓库子路径下验证安装条件、安卓 / 苹果教程、横竖屏、离线重启后的真实游戏、更新确认、失败回退和其他项目缓存保护；结果写入 `artifacts/pwa-browser-verification.json`。手机检查使用浏览器模拟，真机的安装菜单、系统缓存回收和性能仍需在手机上体验。
 
 Godot 草莓输入和物理检查通过 36 项，人机移动检查通过 50 项，战斗与跳跃检查通过 97 项，共 183 项。检查覆盖 J / K 键、摇杆与另一根手指同时砍击或跳跃、跳跃中键盘与触控预输入砍击、落地后仅执行一次、预输入在重开/死亡/失焦时清除、实测 2.85 / 5.70 距离与两倍比例、不同朝向、跳跃后才命中、动作锁定、死亡两半与角色配色、玩家对刀公平性及精确回弹、人机同时或先后互砍只淘汰一个且死亡后不能反杀、障碍和边界阻挡、人机攻击、空中重开与失焦保护。移动回归检查关闭近战 AI 和人机碰撞，以独立检查原有操作。
 

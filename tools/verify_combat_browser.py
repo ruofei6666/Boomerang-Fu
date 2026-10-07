@@ -82,6 +82,8 @@ def main():
         page.add_init_script(AUDIO_PROBE)
         # Use actual combat and physics; freeze NPCs so input checks have a clear route.
         page.goto(args.url.rstrip("/") + "/?verify=1&input_only=1", wait_until="networkidle", timeout=60000)
+        if page.locator("#pwa-dialog").evaluate("dialog => dialog.open"):
+            page.locator("#pwa-continue").click()
         wait_state(page, "s.attack_id !== undefined && s.jump_id !== undefined && s.jump_button !== undefined && s.attack_buffered !== undefined")
         return page
 

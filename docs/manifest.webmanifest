@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "水果乱斗 · Boomerang Arena",
+  "short_name": "水果乱斗",
+  "lang": "zh-CN",
+  "description": "食物角色与人机乱斗，支持手机横竖屏和离线游玩。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#eaf4de",
+  "theme_color": "#95c989",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

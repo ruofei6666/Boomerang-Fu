@@ -488,6 +488,8 @@ func _refresh_phase() -> void:
 	# 即使玩家在战斗中按 H 隐藏过 HUD，结算和设置仍然必须能操作。
 	show()
 	var phase: String = match_controller.phase
+	if OS.has_feature("web"):
+		get_parent().web_canvas.setAttribute("data-match-phase", phase)
 	var playing: bool = phase in ["playing", "practice"]
 	for control in [$Root/MapTitle, $Root/TopRight, roles_label, joystick, melee_button, jump_button, throw_button, respawn_button]:
 		control.visible = playing

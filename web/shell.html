@@ -4,8 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#95c989">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="水果乱斗">
   <title>水果乱斗 · Boomerang Arena</title>
-  <link rel="icon" href="data:,">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="pwa.css">
   <style>
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #95c989; touch-action: none; overscroll-behavior: none; }
     #canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
@@ -26,26 +32,86 @@
     <p>选择击杀计分或存活加分 · 先到 10 分获胜</p>
     <p id="error" hidden></p>
   </div>
+  <button id="pwa-menu" type="button" aria-haspopup="dialog" aria-controls="pwa-dialog"><span id="pwa-dot" aria-hidden="true"></span><span id="pwa-menu-label">安装 / 离线</span></button>
+  <dialog id="pwa-dialog" aria-labelledby="pwa-title" aria-describedby="pwa-description">
+    <header class="pwa-head">
+      <img src="icons/icon-192.png" width="52" height="52" alt="" aria-hidden="true">
+      <div><p class="pwa-kicker">水果乱斗 · 手机游玩</p><h2 id="pwa-title">把庭院装进手机</h2></div>
+      <button id="pwa-close" class="pwa-close" type="button" aria-label="关闭安装教程">×</button>
+    </header>
+    <div class="pwa-body">
+      <p id="pwa-description">安装为 PWA（添加到主屏幕），再从桌面「水果乱斗」图标进入，隐藏浏览器地址栏。首次联网准备好资源后，断网也能与人机对战。</p>
+      <p id="pwa-installed" class="pwa-notice" hidden>已从桌面 App 进入。离线包和更新状态见下方。</p>
+      <p id="pwa-in-app" class="pwa-notice" hidden>你正在微信或 QQ 内打开。点右上角「···」选择在浏览器中打开：安卓用 Chrome，苹果用 Safari。</p>
+      <p id="pwa-insecure" class="pwa-notice" hidden>当前网址不支持安装和离线保存。请打开 <a href="https://ruofei6666.github.io/Boomerang-Fu/" target="_blank" rel="noopener">HTTPS 在线版</a>，再按下面步骤安装。</p>
+      <div class="pwa-tabs" role="group" aria-label="选择手机安装教程">
+        <button id="pwa-android-tab" type="button" aria-pressed="true" aria-controls="pwa-android-guide">安卓 Android</button>
+        <button id="pwa-ios-tab" type="button" aria-pressed="false" aria-controls="pwa-ios-guide">苹果 iPhone / iPad</button>
+      </div>
+      <section id="pwa-android-guide" aria-labelledby="pwa-android-tab">
+        <ol class="pwa-steps">
+          <li><b>用 Chrome 打开游戏</b><p>在安卓手机的 Chrome 中打开当前网址。</p></li>
+          <li><b>菜单 → 安装应用</b><p>点右上角「⋮」，选择「安装应用」或「安装并创建快捷方式 → 安装」。部分版本显示「添加到主屏幕」。</p></li>
+          <li><b>回到桌面，点击水果图标</b><p>从「水果乱斗」图标进入游戏；横屏和竖屏都可以玩。</p></li>
+        </ol>
+        <p class="pwa-note">若仍有地址栏，请在 Chrome 菜单中选择「安装」应用。电脑也可使用 Chrome / Edge 的安装按钮。</p>
+        <a class="pwa-source" href="https://support.google.com/chrome/answer/9658361?hl=zh-Hans&amp;co=GENIE.Platform%3DAndroid" target="_blank" rel="noopener">Chrome 官方安装指引 ↗</a>
+      </section>
+      <section id="pwa-ios-guide" aria-labelledby="pwa-ios-tab" hidden>
+        <ol class="pwa-steps">
+          <li><b>用 Safari 打开游戏</b><p>在 iPhone / iPad 的 Safari 中打开当前网址。</p></li>
+          <li><b>共享 → 添加到主屏幕</b><p>点共享按钮（方框向上箭头）；部分布局需先打开页面菜单，再点「共享」。向下找到「添加到主屏幕」。</p></li>
+          <li><b>添加为网页 App，再从桌面进入</b><p>若出现「作为网页 App 打开」，保持开启，再点「添加」。回到主屏幕，点击「水果乱斗」图标。</p></li>
+        </ol>
+        <p class="pwa-note">找不到该选项时，在共享菜单底部点「编辑操作」。安装后隐藏浏览器工具栏，系统状态栏和手势条可能仍保留。</p>
+        <a class="pwa-source" href="https://support.apple.com/zh-cn/guide/iphone/iphea86e5236/ios" target="_blank" rel="noopener">Apple 官方安装指引 ↗</a>
+      </section>
+      <section class="pwa-offline" aria-labelledby="pwa-offline-title">
+        <div class="pwa-section-head"><h3 id="pwa-offline-title">离线包与更新</h3><button id="pwa-check" type="button" class="pwa-link-button">检查更新</button></div>
+        <p id="pwa-status" role="status" aria-live="polite">正在准备离线资源…</p>
+        <progress id="pwa-progress" max="1" value="0" aria-label="离线包下载进度" hidden></progress>
+        <p class="pwa-note">首次离线包约 40 MB，请保持联网，等到「离线可玩」后再断网。在桌面 App 中也请确认一次此状态。清理网站数据后，需要重新联网下载。</p>
+        <p class="pwa-note">联网打开游戏会检查新版本；新版下载完整后才提示更新。离线时继续使用当前版本。</p>
+        <div id="pwa-update" class="pwa-notice" hidden>
+          <b>新版本已下载完成</b><p>更新会重新打开游戏，本场分数不会保留。可以先打完，再更新。</p>
+          <div class="pwa-update-actions"><button id="pwa-update-now" type="button" class="pwa-primary">更新并重开</button><button id="pwa-update-later" type="button">稍后</button></div>
+        </div>
+        <p id="pwa-feedback" role="status" aria-live="polite" hidden></p>
+      </section>
+    </div>
+    <footer class="pwa-foot">
+      <button id="pwa-install" type="button" class="pwa-primary" hidden>安装到桌面</button>
+      <button id="pwa-continue" type="button">暂时用浏览器玩</button>
+    </footer>
+  </dialog>
+  <script src="pwa.js"></script>
   <script src="$GODOT_URL"></script>
   <script>
     const engine = new Engine($GODOT_CONFIG);
     const progress = document.getElementById('progress');
     const canvas = document.getElementById('canvas');
-    document.addEventListener('touchmove', event => event.preventDefault(), { passive: false });
+    document.addEventListener('touchmove', event => {
+      if (!document.getElementById('pwa-dialog').open) event.preventDefault();
+    }, { passive: false });
     window.addEventListener('contextmenu', event => event.preventDefault());
-    engine.startGame({
+    const startGame = () => engine.startGame({
       args: window.isSecureContext ? [] : ['--audio-driver', 'ScriptProcessor'],
       canvas,
       onProgress(current, total) { progress.value = current; progress.max = total || 1; },
     }).then(() => {
       document.getElementById('loading').remove();
-      canvas.focus();
+      if (!document.getElementById('pwa-dialog').open) canvas.focus();
     }).catch(error => {
       const message = document.getElementById('error');
       message.hidden = false;
       message.textContent = '游戏加载失败，请尝试更新浏览器后重新打开。' + String(error);
       console.error(error);
     });
+    // Read the mobile tutorial first. Avoid rendering the 3D arena underneath
+    // it on first launch; later visits to the tutorial pause the running game.
+    const installGuide = document.getElementById('pwa-dialog');
+    if (installGuide.open) installGuide.addEventListener('close', startGame, { once: true });
+    else startGame();
   </script>
 </body>
 </html>

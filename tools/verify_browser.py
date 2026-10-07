@@ -38,6 +38,8 @@ def main():
         page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
         page.goto(args.url + "/?verify=1&movement_only=1")
         page.wait_for_load_state("networkidle")
+        if page.locator("#pwa-dialog").evaluate("dialog => dialog.open"):
+            page.locator("#pwa-continue").click()
         page.wait_for_function("document.getElementById('canvas').hasAttribute('data-game-state') || (document.getElementById('error') && !document.getElementById('error').hidden)", timeout=30000)
         if not state(page):
             raise RuntimeError(page.locator("body").inner_text() + "\n" + "\n".join(console_errors))

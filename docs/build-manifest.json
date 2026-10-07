@@ -4,8 +4,8 @@
   "files": [
     {
       "path": "index.html",
-      "bytes": 2722,
-      "sha256": "a1bc122832f19653c5bbc9de79e286e47eeeeafec3f40970577d938ab405621a"
+      "bytes": 8865,
+      "sha256": "126ab64dbab5f985e6844dc741930cb49e7ba2620bbb0b4b51c9c3e3a9620458"
     },
     {
       "path": "index.js",
@@ -19,8 +19,8 @@
     },
     {
       "path": "index.pck",
-      "bytes": 1856532,
-      "sha256": "935d720bdb62ad87188a97ba585ac221f12633dbc5caf5e9e5963ba69994e7cf"
+      "bytes": 1857140,
+      "sha256": "fe085ac6433736f2e2182dbcf783c232d7998e65d1727e91840fc7a4f0c734fe"
     },
     {
       "path": "index.png",
@@ -36,6 +36,46 @@
       "path": "index.audio.position.worklet.js",
       "bytes": 2973,
       "sha256": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8"
+    },
+    {
+      "path": "pwa.js",
+      "bytes": 10211,
+      "sha256": "acbd4a102fac769d3892fe95d1493df3110484a96cf5aa8433f7ee2601d5ee36"
+    },
+    {
+      "path": "pwa.css",
+      "bytes": 5686,
+      "sha256": "3240ce485932f3d3b5c35c8b858059534514560043141167bbf371aba7aaab0c"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 700,
+      "sha256": "cad2c61e60f91237311b6c2078b26c785193510a13bbbfe5f8194200690e3110"
+    },
+    {
+      "path": "sw.js",
+      "bytes": 6453,
+      "sha256": "39b167ba874538daecc6f34199df050861ff650d1f4eaed0c10390094bb414e1"
+    },
+    {
+      "path": "icons/icon-192.png",
+      "bytes": 25348,
+      "sha256": "351e7f437d43584702391bff8bd6d9568cf655a6454bf4c14d411e5a4c34fe0b"
+    },
+    {
+      "path": "icons/icon-512.png",
+      "bytes": 138197,
+      "sha256": "4ca150a6e65e14d1004de8c349cf32a1658804860c34e86eb917295b086cf8f7"
+    },
+    {
+      "path": "icons/icon-maskable-512.png",
+      "bytes": 87096,
+      "sha256": "0e11b8b88e73f2541eabb2f856b8425c75a4fd6d82f17824f29a82b0d7df0ae7"
+    },
+    {
+      "path": "icons/apple-touch-icon.png",
+      "bytes": 22816,
+      "sha256": "d5c3e90e488de0be4dda9b2a491fb03bdce565aba08f87228734ac180651fb27"
     },
     {
       "path": "licenses/noto-sans-sc-OFL.txt",

@@ -13,6 +13,8 @@ var web_blur_callback: JavaScriptObject
 var web_focus_callback: JavaScriptObject
 var web_visibility_callback: JavaScriptObject
 var web_touch_cancel_callback: JavaScriptObject
+var web_pwa_callback: JavaScriptObject
+var web_pwa_paused: bool = false
 var web_window: JavaScriptObject
 var web_canvas: JavaScriptObject
 var combat: Node3D
@@ -52,16 +54,20 @@ func _ready() -> void:
 		web_focus_callback = JavaScriptBridge.create_callback(_web_focus)
 		web_visibility_callback = JavaScriptBridge.create_callback(_web_visibility)
 		web_touch_cancel_callback = JavaScriptBridge.create_callback(_web_touch_cancel)
+		web_pwa_callback = JavaScriptBridge.create_callback(_web_pwa_dialog)
 		browser_window.addEventListener("blur", web_blur_callback)
 		browser_window.addEventListener("focus", web_focus_callback)
 		browser_document.addEventListener("visibilitychange", web_visibility_callback)
 		# Web 的 touchcancel 被引擎转换为普通松手；先取消对应动作，避免误投。
 		browser_document.addEventListener("touchcancel", web_touch_cancel_callback, true)
+		browser_window.addEventListener("boomerang-pwa-dialog", web_pwa_callback)
 	match_controller = Node.new()
 	match_controller.name = "Match"
 	match_controller.set_script(MATCH_SCRIPT)
 	match_controller.legacy_mode = verification_mode
 	add_child(match_controller)
+	if OS.has_feature("web"):
+		_web_pwa_dialog([])
 	if "--capture" in OS.get_cmdline_user_args() or "--capture-ui" in OS.get_cmdline_user_args():
 		_capture_preview.call_deferred()
 
@@ -246,7 +252,22 @@ func _web_blur(_arguments: Array) -> void:
 
 
 func _web_focus(_arguments: Array) -> void:
-	player.has_focus = true
+	player.has_focus = str(web_canvas.getAttribute("data-pwa-dialog")) != "open"
+
+
+func _web_pwa_dialog(_arguments: Array) -> void:
+	# 安装教程覆盖游戏时冻结整场，包括人机、计时、飞镖与计分。
+	# 回调由浏览器直接调用，暂停 SceneTree 后仍可关闭教程恢复。
+	var opened: bool = str(web_canvas.getAttribute("data-pwa-dialog")) == "open"
+	if opened:
+		_web_blur([])
+		if not get_tree().paused:
+			web_pwa_paused = true
+			get_tree().paused = true
+	elif web_pwa_paused:
+		web_pwa_paused = false
+		get_tree().paused = false
+		_web_focus([])
 
 
 func _web_touch_cancel(arguments: Array) -> void:

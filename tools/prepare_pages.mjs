@@ -10,6 +10,9 @@ const output = path.join(root, 'docs');
 const runtimeFiles = [
   'index.html', 'index.js', 'index.wasm', 'index.pck', 'index.png',
   'index.audio.worklet.js', 'index.audio.position.worklet.js',
+  'pwa.js', 'pwa.css', 'manifest.webmanifest', 'sw.js',
+  'icons/icon-192.png', 'icons/icon-512.png',
+  'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',
 ];
 const notices = [
   ['assets/fonts/OFL.txt', 'licenses/noto-sans-sc-OFL.txt'],

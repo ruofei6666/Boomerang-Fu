@@ -44,6 +44,8 @@ def main():
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
         page.goto(args.url.rstrip("/") + "/?verify=1&match_testing=1", wait_until="networkidle", timeout=60000)
+        if page.locator("#pwa-dialog").evaluate("dialog => dialog.open"):
+            page.locator("#pwa-continue").click()
         wait(page, "s.match && s.match.phase === 'lobby'")
         frames(page, 6)
         page.evaluate("document.getElementById('canvas').setAttribute('data-match-scripted', '1')")

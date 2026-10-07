@@ -17,3 +17,4 @@ if (source.includes(guarded)) {
   fs.writeFileSync(filename, source.replace(original, guarded));
   console.log('WEB_HTTP_AUDIO_GUARD: applied');
 }
+await import('./prepare_web_pwa.mjs');
