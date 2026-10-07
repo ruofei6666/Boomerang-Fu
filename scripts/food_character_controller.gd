@@ -26,6 +26,10 @@ var attack_origin := Vector3.ZERO
 var attack_direction := Vector3.FORWARD
 var recoil_from := Vector3.ZERO
 var attack_id: int = 0
+var jump_time: float = 0.0
+var jump_origin := Vector3.ZERO
+var jump_direction := Vector3.FORWARD
+var jump_id: int = 0
 var hit_targets: Dictionary = {}
 var rest_collision_layer: int
 var rest_collision_mask: int
@@ -39,6 +43,8 @@ var held_boomerang: Node3D
 
 const HOP_TIME: float = 0.16
 const HOP_DISTANCE: float = 2.85
+const JUMP_DISTANCE: float = HOP_DISTANCE * 2.0
+const JUMP_TIME: float = HOP_TIME * 2.0
 const SWING_TIME: float = 0.14
 const RECOVERY_TIME: float = 0.28
 const RECOIL_TIME: float = 0.20
@@ -75,6 +81,10 @@ func _physics_process(delta: float) -> void:
 		_process_attack(delta)
 		return
 	var direction: Vector3 = movement_direction(delta)
+	# AI 可以在决策中起跳；这一帧直接执行跳跃，不再叠加走路或改变朝向。
+	if attack_state != "idle":
+		_process_attack(delta)
+		return
 	var horizontal: Vector2 = walking_velocity(direction, delta)
 	velocity.x = horizontal.x
 	velocity.z = horizontal.y
@@ -131,6 +141,9 @@ func reset_character() -> void:
 	walk_phase = 0.0
 	animation_weight = 0.0
 	visual.rotation = Vector3.ZERO
+	jump_time = 0.0
+	jump_origin = global_position
+	jump_direction = facing_direction()
 	_animate_walk(1.0, 0.0, 0.0)
 
 
@@ -138,6 +151,20 @@ func request_attack() -> bool:
 	if not round_active or not alive or attack_state != "idle" or attack_requested:
 		return false
 	attack_requested = true
+	return true
+
+
+func request_jump() -> bool:
+	if not round_active or not alive or attack_state != "idle" or attack_requested:
+		return false
+	jump_origin = global_position
+	jump_direction = facing_direction()
+	jump_time = 0.0
+	jump_id += 1
+	attack_state = "jump"
+	velocity = Vector3.ZERO
+	_animate_walk(1.0, 0.0, 0.0)
+	_reset_weapon_pose()
 	return true
 
 
@@ -160,6 +187,9 @@ func begin_attack() -> void:
 
 
 func _process_attack(delta: float) -> void:
+	if attack_state == "jump":
+		_process_jump(delta)
+		return
 	attack_time += delta
 	velocity = Vector3.ZERO
 	if attack_state == "hop":
@@ -206,6 +236,19 @@ func _process_attack(delta: float) -> void:
 			attack_state = "recovery"
 			attack_time = 0.0
 			_reset_weapon_pose()
+
+
+func _process_jump(delta: float) -> void:
+	jump_time += delta
+	_advance_hop(jump_direction, JUMP_DISTANCE, JUMP_TIME, jump_time, delta)
+	var amount: float = clampf(jump_time / JUMP_TIME, 0.0, 1.0)
+	visual.position.y = sin(amount * PI) * 0.65
+	body_visual.rotation.x = -0.12 * sin(amount * PI)
+	if jump_time >= JUMP_TIME:
+		attack_state = "idle"
+		velocity = Vector3.ZERO
+		visual.position.y = 0.0
+		_reset_weapon_pose()
 
 
 func _advance_hop(direction: Vector3, distance: float, duration: float, elapsed: float, delta: float) -> void:

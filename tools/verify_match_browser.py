@@ -1,4 +1,4 @@
-"""Verify the exported lobby, role choices, score transitions and responsive layout."""
+"""Verify the exported lobby, role choices, scores, bot jumps and responsive layout."""
 
 import argparse
 import json
@@ -144,6 +144,29 @@ def main():
             wait(page, "s.match.phase === 'lobby'")
             check(state(page)["match"]["roles"] == roles, "Web play-again returns to settings and keeps role choices")
             snapshots["desktop"] = state(page)["match"]
+            # Run real FFA without injected actions; observe autonomous NPC jumps.
+            snapshots["bot_jumps"] = {}
+            for difficulty in range(3):
+                choose(page, "difficulty", difficulty)
+                click(page, "start")
+                wait(page, "s.match.phase === 'playing'")
+                observed = False
+                for attempt in range(3):
+                    # Keep the completed jump counter: a bot can land or be hit
+                    # between polling the canvas and fetching its next snapshot.
+                    wait(page, "s.match.phase !== 'playing' || s.wanderers.some(bot => bot.jump_id > 0)")
+                    current = state(page)
+                    observed = any(bot["jump_id"] > 0 and bot["jump_reason"] in ("chase", "dodge") for bot in current["wanderers"])
+                    if observed or current["match"]["phase"] != "scores":
+                        break
+                    if attempt < 2:
+                        click(page, "next")
+                        wait(page, "s.match.phase === 'playing'")
+                check(observed, f"Web difficulty {difficulty} bots autonomously jump during real FFA")
+                snapshots["bot_jumps"][str(difficulty)] = current["wanderers"]
+                page.screenshot(path=str(ARTIFACTS / f"ai_jump_web_{difficulty}.png"))
+                click(page, "settings" if state(page)["match"]["phase"] == "playing" else "lobby")
+                wait(page, "s.match.phase === 'lobby'")
             desktop.close()
 
             mobile = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=3, is_mobile=True, has_touch=True)

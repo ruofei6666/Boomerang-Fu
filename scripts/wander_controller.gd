@@ -1,5 +1,5 @@
 extends "res://scripts/food_character_controller.gd"
-## 人机只在世界坐标中散步：随机选方向、短暂停顿，提前探测碰撞后换路。
+## 混战人机追击、跳跃和避砍；独立散步模式保留随机停顿与避障。
 
 @export var random_seed: int = 0
 @export var wander_radius: float = 8.0
@@ -24,6 +24,12 @@ var path_timer: float = 0.0
 var path: PackedVector2Array = PackedVector2Array()
 var path_index: int = 0
 var evasion_side: float = 1.0
+var jump_cooldown: float = 0.0
+var jump_reaction: float = 0.0
+var dodge_reaction: float = 0.0
+var jump_interval: float = 2.0
+var dodge_delay: float = 0.05
+var last_jump_reason: String = ""
 
 
 func _ready() -> void:
@@ -35,6 +41,12 @@ func _ready() -> void:
 		random.seed = random_seed
 	destination = position
 	idle_time = random.randf_range(0.55, 1.25)
+
+
+func _physics_process(delta: float) -> void:
+	if round_active and alive:
+		jump_cooldown = maxf(0.0, jump_cooldown - delta)
+	super._physics_process(delta)
 
 
 func movement_direction(delta: float) -> Vector3:
@@ -85,6 +97,8 @@ func set_difficulty(level: int) -> void:
 	reaction_delay = [0.56, 0.30, 0.14][ai_difficulty]
 	attack_interval = [1.15, 0.80, 0.48][ai_difficulty]
 	walk_speed = [6.5, 8.0, 9.0][ai_difficulty]
+	jump_interval = [2.8, 2.0, 1.2][ai_difficulty]
+	dodge_delay = [0.08, 0.05, 0.025][ai_difficulty]
 
 
 func _arena_direction(delta: float) -> Vector3:
@@ -103,14 +117,26 @@ func _arena_direction(delta: float) -> Vector3:
 		target_timer = [0.55, 0.30, 0.16][ai_difficulty]
 		if previous != target_actor:
 			melee_reaction = 0.0
+			jump_reaction = 0.0
 			path_timer = 0.0
 	if not is_instance_valid(target_actor):
 		walking = false
+		jump_reaction = 0.0
+		dodge_reaction = 0.0
+		return Vector3.ZERO
+	if _try_dodge_jump(delta):
 		return Vector3.ZERO
 	var offset: Vector3 = target_actor.global_position - global_position
 	offset.y = 0.0
 	var distance: float = offset.length()
 	var clear: bool = combat.clear_path(self, target_actor)
+	# 留出近战距离，落地时不会越过目标或撞上目标的身体。
+	if distance >= JUMP_DISTANCE + 2.0 and clear and jump_cooldown <= 0.0 and _can_jump(offset.normalized()):
+		jump_reaction += delta
+		if jump_reaction >= reaction_delay and _begin_ai_jump(offset.normalized(), "chase"):
+			return Vector3.ZERO
+	else:
+		jump_reaction = 0.0
 	if distance < 2.75 and distance > 0.05 and clear:
 		walking = false
 		visual.rotation.y = lerp_angle(visual.rotation.y, atan2(offset.x, offset.z), 1.0 - exp(-15.0 * delta))
@@ -152,6 +178,63 @@ func _arena_direction(delta: float) -> Vector3:
 			if not found:
 				return Vector3.ZERO
 	return direction
+
+
+func _can_jump(direction: Vector3) -> bool:
+	if direction.is_zero_approx():
+		return false
+	var landing: Vector3 = global_position + direction * JUMP_DISTANCE
+	# 全程保留碰撞；落点留出角色半径，不朝岩石、其他角色或地图边缘跳。
+	if absf(landing.x) > 16.5 or absf(landing.z) > 11.2:
+		return false
+	return not test_move(global_transform, direction * JUMP_DISTANCE)
+
+
+func _begin_ai_jump(direction: Vector3, reason: String) -> bool:
+	if jump_cooldown > 0.0 or not _can_jump(direction):
+		return false
+	visual.rotation.y = atan2(direction.x, direction.z)
+	if not request_jump():
+		return false
+	jump_cooldown = jump_interval + random.randf_range(0.05, 0.25)
+	jump_reaction = 0.0
+	dodge_reaction = 0.0
+	melee_reaction = 0.0
+	walking = false
+	path_timer = 0.0
+	last_jump_reason = reason
+	return true
+
+
+func _try_dodge_jump(delta: float) -> bool:
+	if jump_cooldown > 0.0:
+		dodge_reaction = 0.0
+		return false
+	var threat: CharacterBody3D
+	var nearest: float = HOP_DISTANCE + combat.RANGE + 0.5
+	for actor in combat.actors:
+		if actor == self or not actor.alive or actor.attack_state not in ["hop", "swing"]:
+			continue
+		var away: Vector3 = global_position - actor.global_position
+		away.y = 0.0
+		var distance: float = away.length()
+		if distance > 0.05 and distance < nearest and actor.attack_direction.dot(away / distance) >= combat.FRONT_COS and combat.clear_path(actor, self):
+			threat = actor
+			nearest = distance
+	if not is_instance_valid(threat):
+		dodge_reaction = 0.0
+		return false
+	dodge_reaction += delta
+	if dodge_reaction < dodge_delay:
+		return false
+	var away: Vector3 = global_position - threat.global_position
+	away.y = 0.0
+	away = away.normalized()
+	var side: Vector3 = away.rotated(Vector3.UP, PI * 0.5 * evasion_side)
+	for direction in [side, -side, away, away.rotated(Vector3.UP, PI * 0.25), away.rotated(Vector3.UP, -PI * 0.25)]:
+		if _begin_ai_jump(direction, "dodge"):
+			return true
+	return false
 
 
 func _choose_destination() -> void:
@@ -200,6 +283,10 @@ func reset_character() -> void:
 	super.reset_character()
 	melee_reaction = 0.0
 	melee_cooldown = 0.0
+	jump_cooldown = random.randf_range(0.25, 0.70)
+	jump_reaction = 0.0
+	dodge_reaction = 0.0
+	last_jump_reason = ""
 	target_actor = null
 	target_timer = 0.0
 	path_timer = 0.0

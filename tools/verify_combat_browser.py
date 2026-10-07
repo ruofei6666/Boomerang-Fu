@@ -85,6 +85,11 @@ def main():
         wait_state(page, "s.attack_id !== undefined && s.jump_id !== undefined && s.jump_button !== undefined && s.attack_buffered !== undefined")
         return page
 
+    def reset(page):
+        x, y, width, height = state(page)["match"]["controls"]["settings"]
+        page.mouse.click(x + width / 2, y + height / 2)
+        wait_state(page, "Math.abs(s.position[0]) < 0.01 && Math.abs(s.position[2] - 3) < 0.01 && s.attack_state === 'idle'")
+
     try:
         with sync_playwright() as playwright:
             launch_args = ["--autoplay-policy=no-user-gesture-required"]
@@ -111,9 +116,7 @@ def main():
             snapshots["desktop"] = {"before": before, "after": after, "audio": audio}
             print("AUDIO_PROBE: " + json.dumps(audio), flush=True)
             # Reset to the same clear starting area before measuring the longer jump.
-            viewport = page.viewport_size
-            page.mouse.click(viewport["width"] - 78, viewport["height"] - 46)
-            wait_state(page, "Math.abs(s.position[0]) < 0.01 && Math.abs(s.position[2] - 3) < 0.01 && s.attack_state === 'idle'")
+            reset(page)
             jump_before = state(page)
             page.keyboard.press("k")
             wait_state(page, "s.jump_id > arg", jump_before["jump_id"])
@@ -125,8 +128,7 @@ def main():
             check(jump_after["attack_id"] == jump_before["attack_id"] and jump_after["sound_counts"]["slash"] == jump_before["sound_counts"]["slash"], "K does not trigger melee damage or slash audio")
             check(abs(jump_after["jump_height"]) < 0.001 and math.hypot(*jump_after["velocity"]) < 0.01, "Web jump lands and stops without continuing forward")
             snapshots["desktop_jump"] = {"before": jump_before, "after": jump_after, "distance": jump_distance, "slash_hop": distance}
-            page.mouse.click(viewport["width"] - 78, viewport["height"] - 46)
-            wait_state(page, "Math.abs(s.position[0]) < 0.01 && Math.abs(s.position[2] - 3) < 0.01 && s.attack_state === 'idle'")
+            reset(page)
             buffered_before = state(page)
             # Send J immediately after K, before waiting for a rendered state snapshot.
             page.keyboard.down("k")
@@ -182,8 +184,7 @@ def main():
             check(after["attack_id"] == before["attack_id"] + 1, "Touch press performs one slash without a duplicate simulated mouse attack")
             check(math.hypot(*after["joystick"]) < 0.01, "Canceled touches release the joystick after the attack")
             snapshots["portrait"] = {"before": before, "during": during, "after": after}
-            phone.mouse.click(390 - 78, 844 - 46)
-            wait_state(phone, "Math.abs(s.position[0]) < 0.01 && Math.abs(s.position[2] - 3) < 0.01 && s.attack_state === 'idle'")
+            reset(phone)
             first_jump = state(phone)
             jx, jy = first_jump["jump_button"]
             touches("touchStart", [(3, x + radius * 0.7, y)])
@@ -200,8 +201,7 @@ def main():
             check(jump_after["jump_id"] == jump_before["jump_id"] + 1 and jump_after["attack_id"] == jump_before["attack_id"], "Touch jump fires once without a simulated mouse duplicate or slash")
             check(math.hypot(*jump_after["joystick"]) < 0.01 and abs(jump_after["jump_height"]) < 0.001, "Canceled touches release the joystick and the jump lands")
             snapshots["portrait_jump"] = {"before": jump_before, "during": jump_during, "after": jump_after}
-            phone.mouse.click(390 - 78, 844 - 46)
-            wait_state(phone, "Math.abs(s.position[0]) < 0.01 && Math.abs(s.position[2] - 3) < 0.01 && s.attack_state === 'idle'")
+            reset(phone)
             touches("touchStart", [(6, x + radius * 0.7, y)])
             wait_state(phone, "s.touch >= 0 && s.joystick[0] > 0.5")
             buffered_before = state(phone)
@@ -218,11 +218,11 @@ def main():
             snapshots["portrait_buffered"] = {"before": buffered_before, "during": buffered_during, "after": buffered_after}
             phone.screenshot(path=str(ARTIFACTS / "combat_browser_portrait.png"))
             phone.set_viewport_size({"width": 844, "height": 390})
-            wait_state(phone, "s.attack_button[0] > 680 && s.attack_button[1] < 300")
+            wait_state(phone, "s.attack_button[0] > 680 && s.attack_button[1] < 390")
             landscape = state(phone)
-            check(700 < landscape["attack_button"][0] < 830 and 120 < landscape["attack_button"][1] < 300, "Landscape slash button repositions within the phone viewport")
+            check(700 < landscape["attack_button"][0] < 830 and landscape["attack_radius"] <= landscape["attack_button"][1] <= 390 - landscape["attack_radius"], "Landscape slash button repositions within the phone viewport")
             jx, jy = landscape["jump_button"]
-            check(570 < jx < 720 and 120 < jy < 300 and math.hypot(jx - landscape["attack_button"][0], jy - landscape["attack_button"][1]) > landscape["jump_radius"] + landscape["attack_radius"], "Landscape jump and slash icons fit side by side without overlapping")
+            check(570 < jx < 720 and abs(jy - landscape["attack_button"][1]) < 1 and landscape["jump_radius"] <= jy <= 390 - landscape["jump_radius"] and math.hypot(jx - landscape["attack_button"][0], jy - landscape["attack_button"][1]) > landscape["jump_radius"] + landscape["attack_radius"], "Landscape jump and slash icons fit side by side without overlapping")
             snapshots["landscape"] = landscape
             phone.screenshot(path=str(ARTIFACTS / "combat_browser_landscape.png"))
             mobile.close()

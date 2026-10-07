@@ -1,16 +1,9 @@
 extends "res://scripts/food_character_controller.gd"
 ## 玩家选择的食物角色读取键盘与摇杆，K 独立前跳，J 跳斩。
 
-const JUMP_DISTANCE: float = HOP_DISTANCE * 2.0
-const JUMP_TIME: float = HOP_TIME * 2.0
-
 var camera_rig: Node3D
 var joystick: Control
 var has_focus: bool = true
-var jump_time: float = 0.0
-var jump_origin := Vector3.ZERO
-var jump_direction := Vector3.FORWARD
-var jump_id: int = 0
 var attack_buffered: bool = false
 
 
@@ -32,17 +25,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func request_jump() -> bool:
-	if not round_active or not has_focus or not alive or attack_state != "idle" or attack_requested:
+	if not has_focus or not super.request_jump():
 		return false
-	jump_origin = global_position
-	jump_direction = facing_direction()
-	jump_time = 0.0
-	jump_id += 1
 	attack_buffered = false
-	attack_state = "jump"
-	velocity = Vector3.ZERO
-	_animate_walk(1.0, 0.0, 0.0)
-	_reset_weapon_pose()
 	return true
 
 
@@ -59,22 +44,11 @@ func request_attack() -> bool:
 
 
 func _process_attack(delta: float) -> void:
-	if attack_state != "jump":
-		super._process_attack(delta)
-		return
-	jump_time += delta
-	_advance_hop(jump_direction, JUMP_DISTANCE, JUMP_TIME, jump_time, delta)
-	var amount: float = clampf(jump_time / JUMP_TIME, 0.0, 1.0)
-	visual.position.y = sin(amount * PI) * 0.65
-	body_visual.rotation.x = -0.12 * sin(amount * PI)
-	if jump_time >= JUMP_TIME:
-		attack_state = "idle"
-		velocity = Vector3.ZERO
-		visual.position.y = 0.0
-		_reset_weapon_pose()
-		if attack_buffered:
-			attack_buffered = false
-			request_attack()
+	var was_jumping: bool = attack_state == "jump"
+	super._process_attack(delta)
+	if was_jumping and attack_state == "idle" and attack_buffered:
+		attack_buffered = false
+		request_attack()
 
 
 func movement_input() -> Vector2:

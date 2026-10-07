@@ -115,7 +115,10 @@ func _process(delta: float) -> void:
 			"walking": actor.walking,
 			"feet": [actor.left_foot.position.y, actor.right_foot.position.y],
 			"alive": actor.alive,
-			"attack_state": actor.attack_state
+			"attack_state": actor.attack_state,
+			"jump_id": actor.jump_id,
+			"jump_reason": actor.last_jump_reason,
+			"jump_height": actor.visual.position.y
 		})
 	var state := {
 		"physics_frame": Engine.get_physics_frames(),

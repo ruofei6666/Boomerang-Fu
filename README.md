@@ -6,6 +6,8 @@ Godot 4.7.2 的 3D 食物角色乱斗游戏。进入游戏先设置 1–5 个人
 
 人机在整张地图追击附近的存活对手，沿安全格路径绕过岩石，也会互相砍击。人机之间相向挥砍最多淘汰一个：先出刀者先结算，完全同时出刀则随机决定先手，被淘汰的人机不能继续反杀另一人机；对刀回弹只在有玩家参与时发生。简单、普通、困难的移动速度分别为 6.5 / 8.0 / 9.0，反应等待分别为 0.56 / 0.30 / 0.14 秒，攻击间隔分别为 1.15 / 0.80 / 0.48 秒并附少量随机延迟；所有角色仍然一击淘汰。玩家淘汰后镜头跟随仍存活的人机，等待真实战斗决出小局结果。
 
+三档人机都会独立跳跃：在直线通路足够宽、距离足够远时向对手跳进，发现对手朝自己起手砍击时尝试向侧面或后方跳开。人机和玩家共用 5.70 距离、0.32 秒的跳跃动作，起跳后锁定方向，全程保留岩石和角色碰撞；跳跃本身不造成伤害。起跳前检查整条路线和落点边界，近距离仍使用原有跳斩。简单、普通、困难的跳跃间隔分别为 2.8 / 2.0 / 1.2 秒并附少量随机延迟，避砍反应分别为 0.08 / 0.05 / 0.025 秒；下一小局清除跳跃和 AI 决策状态。
+
 茄子有紫色身体和绿色叶帽；甜甜圈有真正贯穿的圆孔、粉色糖霜和彩糖；胡萝卜有渐尖的橙色身体、纹路和绿叶。四种角色各有两颗同色同大的圆球手，左手和右手对称地放在身体两侧，右手握着与角色配色一致的立体圆角 V 形回旋镖：草莓红、茄子紫、甜甜圈粉、胡萝卜橙。两只手都随身体一起转身和走动。键盘和摇杆只控制设置页里“你”所选的角色。
 
 ## 直接试玩
@@ -47,9 +49,9 @@ Godot 4.7.2 的 3D 食物角色乱斗游戏。进入游戏先设置 1–5 个人
 - `scenes/stone_arena.tscn`：原有岩石庭院和草莓实例。
 - `scenes/strawberry_player.tscn`：可在 Godot 编辑器中查看的独立 3D 草莓场景。
 - `scenes/eggplant_npc.tscn`、`scenes/donut_npc.tscn`、`scenes/carrot_npc.tscn`：可独立查看、摆放和配置的人机角色场景。
-- `scripts/food_character_controller.gd`：四个角色共用的碰撞、转身和球形脚动画。
+- `scripts/food_character_controller.gd`：四个角色共用的碰撞、跳跃、跳斩、转身和球形脚动画。
 - `scripts/player_controller.gd`：玩家所选角色的键盘、摇杆和按镜头方向移动。
-- `scripts/wander_controller.gd`：三档自由混战 AI，追击所有存活对手、沿共用路径绕过岩石、动态碰撞避让；保留独立散步回归模式。
+- `scripts/wander_controller.gd`：三档自由混战 AI，追击所有存活对手、跳跃追赶和避砍、沿共用路径绕过岩石、动态碰撞避让；保留独立散步回归模式。
 - `scripts/match_controller.gd`：参赛配置、分散出生、存活 1 秒判定、全灭平局、累计分数、手动下一局和 10 分胜利。
 - `scripts/interface.gd`、`scripts/score_track.gd`：设置页、逐席位计分页、十个得分点，以及手机横竖屏布局。
 - `scripts/combat_controller.gd`：统一结算对刀、正面命中和一次性音效。
@@ -83,6 +85,7 @@ godot --headless --path . --script res://tools/verify_scene.gd
 godot --headless --path . --script res://tools/verify_wanderers.gd
 godot --headless --path . --fixed-fps 60 --script res://tools/verify_combat.gd
 godot --headless --path . --fixed-fps 60 --script res://tools/verify_match.gd
+godot --headless --path . --fixed-fps 60 --script res://tools/verify_ai_jump.gd
 godot --headless --path . --export-release Web build/web/index.html
 node tools/patch_web_export.mjs
 node tools/prepare_pages.mjs
@@ -97,7 +100,7 @@ Web 使用 Compatibility 渲染器和单线程模板，导出预设保存在 `ex
 
 每次重新导出后运行 `node tools/patch_web_export.mjs`。它为 Godot 4.7.2 的 Web 音频初始化加上能力检查；HTML 启动页在 HTTP 局域网页面明确选择引擎的 ScriptProcessor 后备方式，HTTPS 页面保留 AudioWorklet。三种短 WAV 音效会随场景一起打包。此兼容修改核对了官方源文件 `.firecrawl/godot-web-audio-js.md`、`.firecrawl/godot-web-audio-header.md`。
 
-Godot 草莓输入和物理检查通过 32 项，人机移动检查通过 34 项，战斗与跳跃检查通过 93 项，共 159 项。检查覆盖 J / K 键、摇杆与另一根手指同时砍击或跳跃、跳跃中键盘与触控预输入砍击、落地后仅执行一次、预输入在重开/死亡/失焦时清除、实测 2.85 / 5.70 距离与两倍比例、不同朝向、跳跃后才命中、动作锁定、死亡两半与四种角色配色、玩家对刀公平性及精确回弹、人机同时或先后互砍只淘汰一个且死亡后不能反杀、障碍和边界阻挡、人机攻击、空中重开与失焦保护。移动回归检查关闭近战 AI 和人机碰撞，以独立检查原有操作。
+Godot 草莓输入和物理检查通过 36 项，人机移动检查通过 34 项，战斗与跳跃检查通过 93 项，共 163 项。检查覆盖 J / K 键、摇杆与另一根手指同时砍击或跳跃、跳跃中键盘与触控预输入砍击、落地后仅执行一次、预输入在重开/死亡/失焦时清除、实测 2.85 / 5.70 距离与两倍比例、不同朝向、跳跃后才命中、动作锁定、死亡两半与四种角色配色、玩家对刀公平性及精确回弹、人机同时或先后互砍只淘汰一个且死亡后不能反杀、障碍和边界阻挡、人机攻击、空中重开与失焦保护。移动回归检查关闭近战 AI 和人机碰撞，以独立检查原有操作。
 
 浏览器自动检查使用 Python Playwright，运行 `.venv\Scripts\python.exe tools\verify_browser.py`；无头硬件 WebGL 不可用时添加 `--software-rendering` 使用 SwiftShader。检查包括三个人机自行走动、草莓等待玩家输入、键盘和摇杆移动、松手停止、回到起点和横竖屏布局。最近结果保存在 `artifacts/browser-verification.json`；真实手机体验仍需真机验证。
 
@@ -105,9 +108,11 @@ Godot 草莓输入和物理检查通过 32 项，人机移动检查通过 34 项
 
 `tools/map_builder.gd` 保留地图布局和材质的确定性生成逻辑，并加入草莓实例。重新生成地图会覆盖场景文件，手动调整后请先保存副本。
 
-比赛流程原生验证运行 `tools/verify_match.gd`，46 项通过，覆盖界面配置、四种模型由玩家控制、最多六个席位、出生点安全与间距、连续存活 1 秒、计分唯一性、全灭平局、保留分数和角色、手动下一局、10 分获胜、换角色后的切面与圆点配色，以及玩家淘汰后的真实人机对战。结果保存在 `artifacts/match-verification.json`。加上原有移动、人机散步和战斗检查，原生合计 205 项通过。
+比赛流程原生验证运行 `tools/verify_match.gd`，46 项通过，覆盖界面配置、四种模型由玩家控制、最多六个席位、出生点安全与间距、连续存活 1 秒、计分唯一性、全灭平局、保留分数和角色、手动下一局、10 分获胜、换角色后的切面与圆点配色，以及玩家淘汰后的真实人机对战。结果保存在 `artifacts/match-verification.json`。加上原有移动、人机散步和战斗检查，原生合计 209 项通过。
 
-网页检查运行 `tools/verify_match_browser.py --software-rendering`，24 项通过，实际点击设置和继续按钮、检查手机横竖屏与胜利页；仅专用 `?verify=1&match_testing=1` 链接允许测试注入死亡，计时、计分、状态转换和界面均运行真实逻辑。加上原有战斗、跳跃、音效和多指触控检查，网页合计 51 项通过，无脚本错误。结果保存在 `artifacts/match-browser-verification.json`，截图为 `artifacts/match_*.png`；横屏下六个角色的选择项和分数可完整展示，额外布局记录在 `artifacts/compact-layout-verification.json`。手机检查使用浏览器触控模拟，尚未做真机验证。
+人机跳跃验证运行 `tools/verify_ai_jump.gd`，56 项通过，使用真实地图和物理帧检查四种模型的 5.70 距离、锁定方向、抬起和落地、三档自主追赶与实际避砍、空中冷却、墙体和角色碰撞、边界拒绝、死亡和暂停保护及重开复位。结果保存在 `artifacts/ai-jump-verification.json`。本次同时复测移动 36 项、散步 34 项、战斗 93 项和比赛 46 项，原生合计 265 项通过。
+
+网页检查运行 `tools/verify_match_browser.py --software-rendering`，27 项通过，实际点击设置和继续按钮、检查手机横竖屏与胜利页，并确认三档人机在真实混战中自主跳跃；仅专用 `?verify=1&match_testing=1` 链接允许测试注入死亡，计时、计分、状态转换和界面均运行真实逻辑。加上原有战斗、跳跃、音效和多指触控检查，网页合计 54 项通过，无脚本错误。结果保存在 `artifacts/match-browser-verification.json`，截图为 `artifacts/match_*.png`，人机跳跃的网页对战截图为 `artifacts/ai_jump_web_*.png`；横屏下六个角色的选择项和分数可完整展示，额外布局记录在 `artifacts/compact-layout-verification.json`。手机检查使用浏览器触控模拟，尚未做真机验证。
 
 参考官方接口：[CharacterBody3D](https://docs.godotengine.org/en/stable/classes/class_characterbody3d.html)、[Web 导出](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html)。核对后的文档缓存位于 `.firecrawl/godot-characterbody3d.md`、`.firecrawl/godot-web-export.md`。
 
