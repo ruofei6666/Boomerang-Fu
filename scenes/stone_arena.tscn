@@ -6,8 +6,10 @@
 
 [ext_resource type="PackedScene" path="res://scenes/strawberry_player.tscn" id="4_strawberry"]
 [ext_resource type="PackedScene" path="res://scenes/eggplant_npc.tscn" id="5_eggplant"]
-[ext_resource type="PackedScene" path="res://scenes/donut_npc.tscn" id="6_donut"]
+[ext_resource type="PackedScene" path="res://scenes/pumpkin_npc.tscn" id="6_pumpkin"]
 [ext_resource type="PackedScene" path="res://scenes/carrot_npc.tscn" id="7_carrot"]
+[ext_resource type="PackedScene" path="res://scenes/blueberry_npc.tscn" id="8_blueberry"]
+[ext_resource type="PackedScene" path="res://scenes/watermelon_npc.tscn" id="9_watermelon"]
 
 [sub_resource type="Environment" id="Environment_wtpdb"]
 background_mode = 1
@@ -1636,10 +1638,18 @@ position = Vector3(0, 0.08, 3)
 position = Vector3(-2.9, 0.08, 1.25)
 spawn_position = Vector3(-2.9, 0.08, 1.25)
 
-[node name="DonutNPC" parent="." instance=ExtResource("6_donut")]
+[node name="PumpkinNPC" parent="." instance=ExtResource("6_pumpkin")]
 position = Vector3(2.75, 0.08, 4.4)
 spawn_position = Vector3(2.75, 0.08, 4.4)
 
 [node name="CarrotNPC" parent="." instance=ExtResource("7_carrot")]
 position = Vector3(0.75, 0.08, -0.55)
 spawn_position = Vector3(0.75, 0.08, -0.55)
+
+[node name="BlueberryNPC" parent="." instance=ExtResource("8_blueberry")]
+position = Vector3(-5.8, 0.08, 4.4)
+spawn_position = Vector3(-5.8, 0.08, 4.4)
+
+[node name="WatermelonNPC" parent="." instance=ExtResource("9_watermelon")]
+position = Vector3(5.8, 0.08, 4.4)
+spawn_position = Vector3(5.8, 0.08, 4.4)

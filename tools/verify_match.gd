@@ -49,6 +49,112 @@ func _clear_spawn(actor: CharacterBody3D) -> bool:
 	return true
 
 
+func _stage_strike(seat: int, targets: Array) -> void:
+	# 只固定动作与位置；命中、淘汰、击杀归属和计分仍由真实 Combat 处理。
+	arena.combat.enabled = false
+	_freeze_actors()
+	for index in range(arena.combat.actors.size()):
+		var actor: CharacterBody3D = arena.combat.actors[index]
+		actor.position = Vector3(-12.0 + index * 4.0, 0.08, 8.0)
+		actor.attack_state = "idle"
+		actor.hit_targets.clear()
+	var attacker: CharacterBody3D = arena.combat.actors[seat]
+	attacker.position = Vector3(0.0, 0.08, 5.0)
+	for index in range(targets.size()):
+		arena.combat.actors[targets[index]].position = Vector3((index - (targets.size() - 1) * 0.5) * 1.8, 0.08, 3.5)
+	await _frames(2)
+	arena.combat.enabled = true
+	attacker.attack_state = "swing"
+	attacker.attack_direction = Vector3.FORWARD
+	attacker.attack_time = 0.07
+
+
+func _strike(seat: int, targets: Array) -> void:
+	await _stage_strike(seat, targets)
+	arena.combat.resolve_hits()
+
+
+func _verify_kill_scoring() -> void:
+	match_controller.return_to_lobby()
+	ui.scoring_choice.item_selected.emit(1)
+	_check(match_controller.scoring_mode == 1 and ui.scoring_choice.selected == 1 and ui.rules_label.text.contains("每击杀"), "Scoring dropdown selects kills and explains its rules")
+	match_controller.configure(5, 1, [0, 0, 0, 2, 1, 3])
+	_check(match_controller.scoring_mode == 1, "Changing bots, difficulty or roles preserves the chosen scoring mode")
+	ui.start_button.pressed.emit()
+	_freeze_actors()
+	_check(match_controller.round_points == [0, 0, 0, 0, 0, 0], "New kill-scored match initializes all per-round gains")
+	match_controller.configure(1, 0, [3, 2], 0)
+	_check(match_controller.scoring_mode == 1 and match_controller.bot_count == 5, "Scoring rules cannot change during an active match")
+	await _strike(0, [2, 3])
+	_check(match_controller.scores == [2, 0, 0, 0, 0, 0] and match_controller.round_points == [2, 0, 0, 0, 0, 0], "One real swing killing two opponents awards exactly two player points")
+	arena.combat.resolve_hits()
+	_check(match_controller.scores[0] == 2, "Repeated hit resolution cannot count an already killed victim twice")
+	await _strike(1, [0])
+	_check(not arena.player.alive and match_controller.scores == [2, 1, 0, 0, 0, 0], "A bot receives its kill point while the eliminated player keeps theirs")
+	await _strike(1, [4])
+	_check(match_controller.scores == [2, 2, 0, 0, 0, 0], "Identical food models keep separate scores by attacker seat")
+	await _strike(5, [1])
+	await _frames(65)
+	_check(match_controller.phase == "scores" and match_controller.round_winner == 5 and match_controller.scores == [2, 2, 0, 0, 0, 1], "Last survivor ends a kill-scored round without an extra survival point")
+	_check(ui.score_result.text.contains("不额外加分") and ui.score_caption.text.contains("击杀计分"), "Kill scoreboard states the active rule and excludes a survival bonus")
+	var gained_label: Label = ui.score_list.get_child(0).find_child("RoundGain", true, false)
+	_check(gained_label != null and gained_label.text == "+2", "Scoreboard displays the actual two-point round gain")
+	await _frames(75)
+	_check(match_controller.scores == [2, 2, 0, 0, 0, 1], "Paused kill scoreboard cannot award points again")
+	ui.next_button.pressed.emit()
+	_check(match_controller.scoring_mode == 1 and match_controller.round_points == [0, 0, 0, 0, 0, 0] and match_controller.scores == [2, 2, 0, 0, 0, 1], "Next round retains kill totals and rule, but clears the round gains")
+	await _stage_strike(0, [1])
+	var opponent: CharacterBody3D = arena.combat.actors[1]
+	opponent.attack_state = "swing"
+	opponent.attack_direction = Vector3.BACK
+	opponent.attack_time = 0.07
+	arena.combat.resolve_hits()
+	_check(arena.player.alive and opponent.alive and match_controller.round_points == [0, 0, 0, 0, 0, 0], "Real player clash awards no kill points to either seat")
+	_leave_alive(0)
+	await _frames(65)
+	_check(match_controller.phase == "scores" and match_controller.scores == [2, 2, 0, 0, 0, 1], "Deaths without a combat attacker and mere survival earn no kill points")
+	ui.next_button.pressed.emit()
+	# 保留现有允许玩家同帧换命的命中规则，核对全灭时实际击杀分仍累计。
+	for actor in arena.combat.actors:
+		actor.position = Vector3(0.0, 0.08, 5.0)
+		actor.attack_state = "swing"
+		actor.attack_direction = Vector3.FORWARD
+		actor.attack_time = 0.07
+		actor.hit_targets.clear()
+	var previous_kills: int = arena.combat.kills
+	arena.combat.resolve_hits()
+	await _frames(2)
+	var total_gained: int = 0
+	for points in match_controller.round_points:
+		total_gained += points
+	_check(match_controller.phase == "scores" and match_controller.round_winner == -1 and total_gained == 6 and arena.combat.kills - previous_kills == 6, "All-dead kill round retains one point for each actual simultaneous elimination")
+	_check(ui.score_result.text.contains("击杀分保留"), "An all-dead kill round explains that earned points remain")
+	ui.lobby_button.pressed.emit()
+	_check(ui.scoring_choice.selected == 1, "Returning to settings keeps the kill-scoring selection")
+	match_controller.configure(2, 1, [0, 1, 2])
+	ui.start_button.pressed.emit()
+	_freeze_actors()
+	_check(match_controller.scores == [0, 0, 0] and match_controller.champion == -1, "Restarting a kill match clears the previous totals and champion")
+	for point in range(1, 11):
+		await _strike(0, [1, 2] if point == 10 else [1])
+		if point < 10:
+			arena.combat.actors[2].die()
+			await _frames(65)
+			ui.next_button.pressed.emit()
+	_check(match_controller.phase == "match_over" and match_controller.champion == 0 and match_controller.scores == [10, 0, 0], "Tenth real kill immediately wins the match before another survival award")
+	_check(int(arena.combat.actors[1].alive) + int(arena.combat.actors[2].alive) == 1 and not arena.combat.enabled, "Ten-point victory stops remaining hits even when another opponent is still alive")
+	_check(ui.score_title.text.contains("获胜") and ui.score_result.text.contains("击杀计分") and ui.next_button.text == "再玩一场", "Kill victory screen identifies the rule and offers a new match")
+	ui.next_button.pressed.emit()
+	ui.scoring_choice.item_selected.emit(0)
+	match_controller.configure(1, 1, [0, 1])
+	ui.start_button.pressed.emit()
+	_freeze_actors()
+	await _strike(0, [1])
+	_check(match_controller.scores == [0, 0], "Switching back to survival mode does not count the actual kill itself")
+	await _frames(65)
+	_check(match_controller.scores == [1, 0] and match_controller.round_points == [1, 0], "Survival mode still gives exactly one point after the full hold")
+
+
 func _verify() -> void:
 	root.size = Vector2i(1440, 810)
 	arena = load("res://scenes/stone_arena.tscn").instantiate()
@@ -60,7 +166,15 @@ func _verify() -> void:
 	_check(match_controller.phase == "lobby" and ui.lobby_panel.visible, "Entering the game opens match settings")
 	_check(not arena.combat.enabled and not arena.player.round_active, "Lobby freezes the arena and combat")
 	_check(not arena.player.request_attack() and not arena.player.request_jump(), "Lobby rejects slash and jump input")
+	var expected_roles: Array[String] = ["草莓", "茄子", "南瓜", "胡萝卜", "蓝莓", "西瓜"]
+	var choices_match: bool = true
+	for selector in ui.role_selectors:
+		choices_match = choices_match and selector.item_count == expected_roles.size()
+		for role in range(mini(selector.item_count, expected_roles.size())):
+			choices_match = choices_match and selector.get_item_text(role) == expected_roles[role]
+	_check(choices_match, "Every seat offers pumpkin, blueberry and watermelon in the six-food roster")
 	_check(match_controller.bot_count == 3 and ui.difficulty_choice.item_count == 3, "Default three bots and exactly three difficulty choices")
+	_check(match_controller.scoring_mode == 0 and ui.scoring_choice.item_count == 2 and ui.scoring_choice.selected == 0, "Lobby provides exactly two scoring modes and defaults to survival")
 	ui.plus_button.pressed.emit()
 	ui.plus_button.pressed.emit()
 	_check(match_controller.bot_count == 5 and ui.plus_button.disabled and ui.seat_rows[5].visible, "Bot plus button reaches five and reveals every seat")
@@ -70,7 +184,7 @@ func _verify() -> void:
 	for index in range(4):
 		ui.plus_button.pressed.emit()
 	ui.difficulty_choice.item_selected.emit(2)
-	var roles: Array[int] = [3, 0, 0, 2, 1, 3]
+	var roles: Array[int] = [3, 0, 0, 2, 4, 5]
 	for index in range(roles.size()):
 		ui.role_selectors[index].item_selected.emit(roles[index])
 	_check(match_controller.difficulty == 2 and match_controller.role_choices == roles, "UI applies difficulty and each seat's chosen role")
@@ -168,8 +282,8 @@ func _verify() -> void:
 	_check(match_controller.round_number == final_round and match_controller.phase == "match_over", "A completed match cannot start an eleventh round")
 	ui.next_button.pressed.emit()
 	_check(match_controller.phase == "lobby", "Play again returns to editable match settings")
-	for role in range(4):
-		match_controller.configure(1, 1, [role, (role + 1) % 4])
+	for role in range(match_controller.ROLE_NAMES.size()):
+		match_controller.configure(1, 1, [role, (role + 1) % match_controller.ROLE_NAMES.size()])
 		ui.start_button.pressed.emit()
 		_freeze_actors()
 		_check(arena.player.body_visual == arena.player.get_node(arena.player.body_path) and arena.player.get_meta("role") == role and arena.player.request_jump(), "Role %d supports player controls and its correct body mesh" % role)
@@ -184,8 +298,10 @@ func _verify() -> void:
 			elif String(effect.name).begins_with("FruitHalf"):
 				for part in effect.get_children():
 					cap_count += int(String(part.name).begins_with("CutFace"))
-		_check(matching_dots == 26 and cap_count == (4 if role == 2 else 2), "Role %d keeps its death color and correct cut geometry after changing seats" % role)
+		_check(matching_dots == 26 and cap_count == 2, "Role %d keeps its death color and solid cut geometry after changing seats" % role)
 		match_controller.return_to_lobby()
+	await _verify_kill_scoring()
+	match_controller.return_to_lobby()
 	# 玩家死亡后仍由真实 AI 决出结果，不能因为缺少玩家目标而停摆。
 	match_controller.configure(2, 1, [0, 1, 3])
 	ui.start_button.pressed.emit()

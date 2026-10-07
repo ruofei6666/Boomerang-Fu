@@ -1,4 +1,4 @@
-"""Verify the exported lobby, role choices, scores, bot jumps and responsive layout."""
+"""Verify the exported lobby, both scoring modes, bot jumps and responsive layout."""
 
 import argparse
 import json
@@ -46,6 +46,7 @@ def main():
         page.goto(args.url.rstrip("/") + "/?verify=1&match_testing=1", wait_until="networkidle", timeout=60000)
         wait(page, "s.match && s.match.phase === 'lobby'")
         frames(page, 6)
+        page.evaluate("document.getElementById('canvas').setAttribute('data-match-scripted', '1')")
         return page
 
     def click(page, control, mobile=False, seat=None):
@@ -77,12 +78,18 @@ def main():
         else:
             page.mouse.click(x, y)
         if seat is None:
-            wait(page, "s.match.difficulty === arg", index)
+            field = "scoring_mode" if control == "scoring" else "difficulty"
+            wait(page, f"s.match.{field} === arg", index)
         else:
             wait(page, "s.match.roles[arg[0]] === arg[1]", [seat, index])
 
     def eliminate(page, seats):
         page.evaluate("command => document.getElementById('canvas').setAttribute('data-match-command', JSON.stringify(command))", {"action": "eliminate", "seats": seats})
+
+    def strike(page, attacker, targets):
+        # Stage a real swing; Combat performs collision checks, kills and scoring.
+        page.evaluate("command => document.getElementById('canvas').setAttribute('data-match-command', JSON.stringify(command))", {"action": "strike", "attacker": attacker, "targets": targets})
+        wait(page, "s.match.phase === 'match_over' || arg.every(seat => !s.match.actors[seat].alive)", targets)
 
     def on_screen(rect, width, height):
         x, y, rw, rh = rect
@@ -99,6 +106,7 @@ def main():
             page = load(desktop)
             first = state(page)["match"]
             check(first["bot_count"] == 3 and first["difficulty"] == 1, "Browser opens lobby with three normal bots")
+            check(first["scoring_mode"] == 0 and "最后存活者" in first["rules"], "Web settings default to survival scoring with its matching instructions")
             check(all(not actor["round_active"] for actor in first["actors"]), "Browser lobby pauses all character actions")
             page.screenshot(path=str(ARTIFACTS / "match_lobby_desktop.png"))
             for expected in [4, 5]:
@@ -106,7 +114,7 @@ def main():
                 wait(page, "s.match.bot_count === arg", expected)
             check(state(page)["match"]["bot_count"] == 5, "Desktop count buttons configure five bots")
             choose(page, "difficulty", 2)
-            roles = [3, 0, 1, 2, 3, 0]
+            roles = [3, 0, 1, 2, 4, 5]
             for seat, role in enumerate(roles):
                 choose(page, "roles", role, seat=seat)
             check(state(page)["match"]["roles"] == roles, "Desktop dropdowns set every player and bot role")
@@ -114,6 +122,7 @@ def main():
             wait(page, "s.match.phase === 'playing' && s.match.actors.length === 6")
             started = state(page)["match"]
             check(started["difficulty"] == 2 and started["actors"][0]["role"] == 3 and started["scores"] == [0] * 6, "Start runs a six-role hard match with carrot player and zero scores")
+            check(all(actor["attack_state"] == "idle" and actor["throw_id"] == 0 for actor in started["actors"]), "Scripted scoring scenarios start before autonomous attacks or throws")
             starts = started["actors"]
             distances = [((a["position"][0] - b["position"][0]) ** 2 + (a["position"][2] - b["position"][2]) ** 2) ** 0.5 for i, a in enumerate(starts) for b in starts[i + 1:]]
             check(min(distances) > 5, "Web-exported actors start distributed across the arena")
@@ -136,15 +145,75 @@ def main():
                 wait(page, "s.match.phase === 'playing'")
                 eliminate(page, [1, 2, 3, 4, 5])
                 wait(page, "s.match.phase === 'scores' || s.match.phase === 'match_over'")
-                if state(page)["match"]["scores"][0] != point:
-                    raise AssertionError("Unexpected score during ten-point match")
+                round_state = state(page)
+                if round_state["match"]["scores"][0] != point:
+                    snapshots["ten_point_mismatch"] = round_state
+                    raise AssertionError(
+                        f"Unexpected score during ten-point match: expected {point}, "
+                        f"got {round_state['match']['scores']}, "
+                        f"winner {round_state['match']['winner']}"
+                    )
             check(state(page)["match"]["phase"] == "match_over" and state(page)["match"]["champion"] == 0, "Web tenth point opens match victory and identifies the champion")
             page.screenshot(path=str(ARTIFACTS / "match_victory_desktop.png"))
             click(page, "next")
             wait(page, "s.match.phase === 'lobby'")
             check(state(page)["match"]["roles"] == roles, "Web play-again returns to settings and keeps role choices")
             snapshots["desktop"] = state(page)["match"]
+            choose(page, "scoring", 1)
+            check("每击杀" in state(page)["match"]["rules"], "Desktop scoring dropdown selects kills and updates the rules")
+            click(page, "start")
+            wait(page, "s.match.phase === 'playing'")
+            await_score = [2, 0, 0, 0, 0, 0]
+            strike(page, 0, [2, 3])
+            wait(page, "s.match.scores[0] === 2")
+            check(state(page)["match"]["scores"] == await_score, "Web real multi-target swing awards the player two kill points")
+            frames(page, 20)
+            check(state(page)["match"]["scores"] == await_score, "Repeated Web hit resolution does not score dead targets again")
+            strike(page, 1, [0])
+            wait(page, "s.match.scores[1] === 1")
+            check(state(page)["match"]["scores"] == [2, 1, 0, 0, 0, 0], "Web bot gets its kill point while the eliminated player retains two")
+            strike(page, 1, [4, 5])
+            wait(page, "s.match.phase === 'scores'")
+            kill_round = state(page)["match"]
+            check(kill_round["scores"] == [2, 3, 0, 0, 0, 0] and kill_round["round_points"] == [2, 3, 0, 0, 0, 0], "Web kill scoreboard displays every seat's gains without a survival bonus")
+            check("不额外加分" in kill_round["result"], "Web kill-score result explains the lack of a survivor bonus")
+            page.screenshot(path=str(ARTIFACTS / "match_kills_desktop.png"))
+            click(page, "next")
+            wait(page, "s.match.phase === 'playing'")
+            check(state(page)["match"]["scores"] == [2, 3, 0, 0, 0, 0] and state(page)["match"]["round_points"] == [0] * 6, "Web next kill round retains totals and resets per-round gains")
+            eliminate(page, list(range(6)))
+            wait(page, "s.match.phase === 'scores'")
+            check(state(page)["match"]["scores"] == [2, 3, 0, 0, 0, 0] and "击杀分保留" in state(page)["match"]["result"], "Web all-dead kill round keeps the earned cumulative points")
+            click(page, "lobby")
+            wait(page, "s.match.phase === 'lobby'")
+            check(state(page)["match"]["scoring_mode"] == 1, "Web return to settings remembers the scoring selection")
+            for expected in [4, 3, 2]:
+                click(page, "minus")
+                wait(page, "s.match.bot_count === arg", expected)
+            click(page, "start")
+            wait(page, "s.match.phase === 'playing'")
+            check(state(page)["match"]["scores"] == [0, 0, 0], "Web new kill match resets all seat totals")
+            for point in range(1, 11):
+                strike(page, 0, [1, 2] if point == 10 else [1])
+                if point < 10:
+                    eliminate(page, [2])
+                    wait(page, "s.match.phase === 'scores'")
+                    click(page, "next")
+                    wait(page, "s.match.phase === 'playing'")
+            wait(page, "s.match.phase === 'match_over'")
+            kill_victory = state(page)["match"]
+            check(kill_victory["scores"] == [10, 0, 0] and kill_victory["champion"] == 0 and sum(actor["alive"] for actor in kill_victory["actors"]) == 2, "Web tenth kill wins immediately and stops additional hits while an opponent still lives")
+            check("击杀计分" in kill_victory["result"], "Web match victory reports kill scoring")
+            page.screenshot(path=str(ARTIFACTS / "match_kills_victory_desktop.png"))
+            snapshots["kill_victory"] = kill_victory
+            click(page, "next")
+            wait(page, "s.match.phase === 'lobby'")
+            choose(page, "scoring", 0)
+            for expected in [3, 4, 5]:
+                click(page, "plus")
+                wait(page, "s.match.bot_count === arg", expected)
             # Run real FFA without injected actions; observe autonomous NPC jumps.
+            page.evaluate("document.getElementById('canvas').removeAttribute('data-match-scripted')")
             snapshots["bot_jumps"] = {}
             for difficulty in range(3):
                 choose(page, "difficulty", difficulty)
@@ -163,6 +232,12 @@ def main():
                         click(page, "next")
                         wait(page, "s.match.phase === 'playing'")
                 check(observed, f"Web difficulty {difficulty} bots autonomously jump during real FFA")
+                actor_names = {"Player" if actor["seat"] == 0 else f"Bot{actor['seat']}" for actor in current["match"]["actors"]}
+                check(all(
+                    set(bot.get("dodges_by_opponent", {})) == actor_names - {bot["name"]}
+                    and all(isinstance(count, int) and 0 <= count <= 2 for count in bot["dodges_by_opponent"].values())
+                    for bot in current["wanderers"]
+                ), f"Web difficulty {difficulty} exposes separate dodge counts capped at two for every opponent")
                 snapshots["bot_jumps"][str(difficulty)] = current["wanderers"]
                 page.screenshot(path=str(ARTIFACTS / f"ai_jump_web_{difficulty}.png"))
                 click(page, "settings" if state(page)["match"]["phase"] == "playing" else "lobby")
@@ -173,6 +248,10 @@ def main():
             phone = load(mobile)
             page_match = state(phone)["match"]
             check(on_screen(page_match["controls"]["panel"], 390, 844) and on_screen(page_match["controls"]["start"], 390, 844), "Portrait settings panel and start button fit on screen")
+            check(on_screen(page_match["controls"]["scoring"], 390, 844), "Portrait scoring selector fits on screen")
+            choose(phone, "scoring", 1, True)
+            check(state(phone)["match"]["scoring_mode"] == 1 and "每击杀" in state(phone)["match"]["rules"], "Portrait touch can choose kill scoring and read the matching rules")
+            choose(phone, "scoring", 0, True)
             for expected in [4, 5]:
                 click(phone, "plus", True)
                 wait(phone, "s.match.bot_count === arg", expected)
@@ -183,7 +262,7 @@ def main():
             phone.screenshot(path=str(ARTIFACTS / "match_lobby_portrait.png"))
             click(phone, "start", True)
             wait(phone, "s.match.phase === 'playing'")
-            check(state(phone)["match"]["difficulty"] == 0 and state(phone)["match"]["actors"][0]["role"] == 2, "Touch start enters an easy match with the donut player")
+            check(state(phone)["match"]["difficulty"] == 0 and state(phone)["match"]["actors"][0]["role"] == 2, "Touch start enters an easy match with the pumpkin player")
             eliminate(phone, list(range(6)))
             wait(phone, "s.match.phase === 'scores'")
             check(state(phone)["match"]["scores"] == [0] * 6, "Portrait drawn round displays unchanged scores")
@@ -206,8 +285,23 @@ def main():
             controls = state(phone)["match"]["controls"]
             check(on_screen(controls["panel"], 844, 390) and on_screen(controls["start"], 844, 390), "Landscape settings retain visible controls and start button")
             check(controls["participants"][3] > 120, "Compact landscape settings leave usable room for participant rows")
+            check(on_screen(controls["scoring"], 844, 390), "Landscape scoring selector fits beside count and difficulty")
+            choose(phone, "scoring", 1, True)
             phone.screenshot(path=str(ARTIFACTS / "match_lobby_landscape.png"))
             check(phone.evaluate("document.documentElement.scrollHeight <= innerHeight + 1"), "The game page itself does not scroll in landscape")
+            click(phone, "start", True)
+            wait(phone, "s.match.phase === 'playing'")
+            strike(phone, 0, [1, 2])
+            wait(phone, "s.match.scores[0] === 2")
+            eliminate(phone, [3, 4, 5])
+            wait(phone, "s.match.phase === 'scores'")
+            check(state(phone)["match"]["scores"] == [2, 0, 0, 0, 0, 0], "Touch-started kill match awards two actual kills and no survivor bonus")
+            phone.screenshot(path=str(ARTIFACTS / "match_kills_landscape.png"))
+            phone.set_viewport_size({"width": 390, "height": 844})
+            frames(phone, 18)
+            controls = state(phone)["match"]["controls"]
+            check(on_screen(controls["panel"], 390, 844) and on_screen(controls["next"], 390, 844), "Kill scoreboard remains usable after rotating back to portrait")
+            phone.screenshot(path=str(ARTIFACTS / "match_kills_portrait.png"))
             snapshots["mobile"] = state(phone)["match"]
             mobile.close()
             browser.close()
@@ -216,7 +310,7 @@ def main():
         raise
     check(not errors, "Match Web build has no browser or Godot script errors")
     report = {"passed": sum(c["passed"] for c in checks), "failed": sum(not c["passed"] for c in checks), "checks": checks, "console_errors": errors, "snapshots": snapshots,
-              "validation": "Browser touch simulation; elimination injection only in the dedicated verification URL. Timing, scoring, match transitions and UI use the real game. Physical phone not tested."}
+              "validation": "Browser touch simulation; scripted scoring scenarios freeze actor physics only in the dedicated verification URL before injected eliminations or staged real strikes. Hits, kill attribution, timing, scoring, match transitions and UI use the real game. The separate three-difficulty FFA checks enable autonomous actor physics. Physical phone not tested."}
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f'MATCH_BROWSER_VERIFICATION: {report["passed"]} passed, {report["failed"]} failed', flush=True)
     raise SystemExit(1 if report["failed"] else 0)

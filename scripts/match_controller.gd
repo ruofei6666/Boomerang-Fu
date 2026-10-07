@@ -3,16 +3,22 @@ extends Node
 
 signal phase_changed
 
+enum ScoringMode { SURVIVAL, KILLS }
+
 const WIN_SCORE: int = 10
 const SURVIVOR_HOLD: float = 1.0
 const MAX_BOTS: int = 5
-const ROLE_NAMES: Array[String] = ["草莓", "茄子", "甜甜圈", "胡萝卜"]
-const ROLE_COLORS: Array[Color] = [Color("d94a66"), Color("8661b5"), Color("e38aa7"), Color("df8c3a")]
+const SCORING_NAMES: Array[String] = ["存活加分", "击杀计分"]
+const ROLE_NAMES: Array[String] = ["草莓", "茄子", "南瓜", "胡萝卜", "蓝莓", "西瓜"]
+const ROLE_BADGES: Array[String] = ["莓", "茄", "南", "萝", "蓝", "瓜"]
+const ROLE_COLORS: Array[Color] = [Color("d94a66"), Color("8661b5"), Color("e39a46"), Color("df8c3a"), Color("637ed6"), Color("68a84b")]
 const ROLE_SCENES: Array[PackedScene] = [
 	preload("res://scenes/strawberry_player.tscn"),
 	preload("res://scenes/eggplant_npc.tscn"),
-	preload("res://scenes/donut_npc.tscn"),
-	preload("res://scenes/carrot_npc.tscn")
+	preload("res://scenes/pumpkin_npc.tscn"),
+	preload("res://scenes/carrot_npc.tscn"),
+	preload("res://scenes/blueberry_npc.tscn"),
+	preload("res://scenes/watermelon_npc.tscn")
 ]
 const PLAYER_SCRIPT = preload("res://scripts/player_controller.gd")
 const BOT_SCRIPT = preload("res://scripts/wander_controller.gd")
@@ -20,8 +26,10 @@ const BOT_SCRIPT = preload("res://scripts/wander_controller.gd")
 var phase: String = "lobby"
 var bot_count: int = 3
 var difficulty: int = 1
-var role_choices: Array[int] = [0, 1, 2, 3, 0, 1]
+var scoring_mode: int = ScoringMode.SURVIVAL
+var role_choices: Array[int] = [0, 1, 2, 3, 4, 5]
 var scores: Array[int] = []
+var round_points: Array[int] = []
 var round_number: int = 0
 var round_winner: int = -1
 var champion: int = -1
@@ -37,6 +45,7 @@ func _ready() -> void:
 	process_physics_priority = 200
 	arena = get_parent()
 	combat = arena.combat
+	combat.character_eliminated.connect(_on_character_eliminated)
 	random.randomize()
 	if legacy_mode:
 		phase = "practice"
@@ -45,11 +54,13 @@ func _ready() -> void:
 	arena.get_node("Interface").bind_match(self)
 
 
-func configure(count: int, level: int, choices: Array) -> void:
+func configure(count: int, level: int, choices: Array, mode: int = -1) -> void:
 	if phase != "lobby":
 		return
 	bot_count = clampi(count, 1, MAX_BOTS)
 	difficulty = clampi(level, 0, 2)
+	if mode >= 0:
+		scoring_mode = clampi(mode, ScoringMode.SURVIVAL, ScoringMode.KILLS)
 	for index in range(mini(choices.size(), role_choices.size())):
 		role_choices[index] = clampi(choices[index], 0, ROLE_NAMES.size() - 1)
 
@@ -63,7 +74,8 @@ func start_match() -> void:
 		return
 	_set_active(false)
 	combat.effects.clear()
-	# 换模型和控制脚本，四种食物都能成为玩家或人机，可重复选择。
+	combat.clear_boomerangs()
+	# 换模型和控制脚本，六种食物都能成为玩家或人机，可重复选择。
 	var old_actors: Array[CharacterBody3D] = combat.actors.duplicate()
 	combat.actors.clear()
 	for actor in old_actors:
@@ -114,15 +126,26 @@ func return_to_lobby() -> void:
 func _begin_round() -> void:
 	_set_active(false)
 	combat.effects.clear()
+	combat.clear_boomerangs()
 	var positions: Array[Vector3] = _spawn_positions()
 	for index in range(combat.actors.size()):
 		var actor: CharacterBody3D = combat.actors[index]
 		actor.spawn_position = positions[index]
 		actor.reset_character()
+		if actor.is_in_group("wanderers"):
+			actor.reset_round_dodges()
 		actor.visual.rotation.y = atan2(-actor.position.x, -actor.position.z)
 		if index == 0:
 			actor.joystick.release()
+	if arena.match_testing:
+		# 专用网页计分场景先固定角色，避免自动投掷抢先影响测试布置。
+		# 三档真实混战检查关闭此标记，普通试玩不进入这条分支。
+		var scripted: bool = str(arena.web_canvas.getAttribute("data-match-scripted")) == "1"
+		for actor in combat.actors:
+			actor.set_physics_process(not scripted)
 	round_number += 1
+	round_points.resize(scores.size())
+	round_points.fill(0)
 	round_winner = -1
 	survivor = -1
 	survivor_time = 0.0
@@ -181,12 +204,27 @@ func _physics_process(delta: float) -> void:
 		survivor_time = 0.0
 
 
+func _on_character_eliminated(attacker: CharacterBody3D, victim: CharacterBody3D) -> void:
+	if phase != "playing" or scoring_mode != ScoringMode.KILLS:
+		return
+	var seat: int = combat.actors.find(attacker)
+	if seat < 0 or attacker == victim or combat.actors.find(victim) < 0:
+		return
+	# Combat 只在真正淘汰一次对手后发出信号；分数按席位保存，不随死亡消失。
+	scores[seat] += 1
+	round_points[seat] += 1
+	if scores[seat] >= WIN_SCORE:
+		champion = seat
+		_finish_round(-1)
+
+
 func _finish_round(winner: int) -> void:
 	if phase != "playing":
 		return
 	round_winner = winner
-	if winner >= 0:
+	if winner >= 0 and scoring_mode == ScoringMode.SURVIVAL:
 		scores[winner] += 1
+		round_points[winner] += 1
 		if scores[winner] >= WIN_SCORE:
 			champion = winner
 	_set_active(false)
@@ -200,6 +238,8 @@ func _set_active(active: bool) -> void:
 		actor.round_active = active
 		actor.velocity = Vector3.ZERO
 		actor.attack_requested = false
+		if not active:
+			actor.cancel_throw()
 		if actor.is_in_group("player"):
 			actor.attack_buffered = false
 	var ui: CanvasLayer = arena.get_node("Interface")

@@ -5,7 +5,14 @@ const BUILDER = preload("res://tools/food_character_builder.gd")
 
 func _initialize() -> void:
 	var builder = BUILDER.new()
-	for kind in ["eggplant", "donut", "carrot"]:
+	var kinds: PackedStringArray = OS.get_cmdline_user_args()
+	if kinds.is_empty():
+		kinds = PackedStringArray(BUILDER.KINDS)
+	for kind in kinds:
+		if kind not in BUILDER.KINDS:
+			push_error("Unknown food character: %s" % kind)
+			quit(1)
+			return
 		var actor: CharacterBody3D = builder.build(kind)
 		var scene := PackedScene.new()
 		var result: Error = scene.pack(actor)

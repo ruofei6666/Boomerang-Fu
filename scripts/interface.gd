@@ -4,6 +4,7 @@ const JOYSTICK_SCRIPT = preload("res://scripts/virtual_joystick.gd")
 const UI_FONT = preload("res://assets/fonts/noto_sans_sc_ui.ttf")
 const MELEE_BUTTON_SCRIPT = preload("res://scripts/melee_button.gd")
 const JUMP_BUTTON_SCRIPT = preload("res://scripts/jump_button.gd")
+const THROW_BUTTON_SCRIPT = preload("res://scripts/throw_button.gd")
 const SCORE_TRACK_SCRIPT = preload("res://scripts/score_track.gd")
 const MATCH_SCRIPT = preload("res://scripts/match_controller.gd")
 
@@ -21,6 +22,7 @@ var roles_label: Label
 var touch_mode: bool = false
 var melee_button: Control
 var jump_button: Control
+var throw_button: Control
 var match_controller: Node
 var overlay: Control
 var lobby_panel: PanelContainer
@@ -29,6 +31,9 @@ var bot_count_label: Label
 var minus_button: Button
 var plus_button: Button
 var difficulty_choice: OptionButton
+var scoring_choice: OptionButton
+var rules_label: Label
+var settings_grid: GridContainer
 var role_selectors: Array[OptionButton] = []
 var seat_rows: Array[PanelContainer] = []
 var seat_badges: Array[Label] = []
@@ -37,6 +42,7 @@ var next_button: Button
 var lobby_button: Button
 var score_title: Label
 var score_result: Label
+var score_caption: Label
 var score_list: GridContainer
 var seat_grid: GridContainer
 var participants_scroll: ScrollContainer
@@ -82,6 +88,11 @@ func _ready() -> void:
 	jump_button.player = melee_button.player
 	jump_button.jump_pressed.connect(_jump)
 	root.add_child(jump_button)
+	throw_button = Control.new()
+	throw_button.name = "ThrowButton"
+	throw_button.set_script(THROW_BUTTON_SCRIPT)
+	throw_button.player = melee_button.player
+	root.add_child(throw_button)
 	_build_menus()
 	touch_mode = DisplayServer.is_touchscreen_available() or OS.has_feature("android") or OS.has_feature("ios")
 	if OS.has_feature("web"):
@@ -122,11 +133,20 @@ func _layout_controls() -> void:
 	respawn_button.size = Vector2(116.0, 44.0) * unit
 	respawn_button.position = Vector2(logical.x - 136.0 * unit, 16.0 * unit)
 	var attack_size: float = (100.0 if mobile else 106.0) * unit
+	if pixels.x < 560.0:
+		attack_size = minf(attack_size, maxf(64.0, (pixels.y - 126.0) / 3.0 - 14.0) * unit)
 	melee_button.size = Vector2.ONE * attack_size
 	melee_button.position = Vector2(logical.x - attack_size - 26.0 * unit, logical.y - attack_size - 24.0 * unit)
 	jump_button.size = Vector2.ONE * attack_size
 	# 窄屏上下排列，避免跳跃图标与左下角摇杆的触控区域重叠。
 	jump_button.position = melee_button.position - (Vector2(0.0, attack_size + 14.0 * unit) if pixels.x < 560.0 else Vector2(attack_size + 14.0 * unit, 0.0))
+	throw_button.size = Vector2.ONE * attack_size
+	if pixels.x < 560.0:
+		throw_button.position = jump_button.position - Vector2(0.0, attack_size + 14.0 * unit)
+	elif pixels.x < 760.0:
+		throw_button.position = melee_button.position - Vector2(0.0, attack_size + 14.0 * unit)
+	else:
+		throw_button.position = jump_button.position - Vector2(attack_size + 14.0 * unit, 0.0)
 	_layout_menus(pixels, logical, unit)
 
 
@@ -141,10 +161,20 @@ func _process(_delta: float) -> void:
 			living += int(actor.alive)
 		var role: String = MATCH_SCRIPT.ROLE_NAMES[match_controller.role_choices[0]]
 		roles_label.text = "第 %d 小局 · 你是%s · 存活 %d / %d" % [match_controller.round_number, role, living, match_controller.scores.size()]
+		if match_controller.scoring_mode == MATCH_SCRIPT.ScoringMode.KILLS:
+			roles_label.text = "第 %d 小局 · 击杀计分 · 你 %d / 10 分" % [match_controller.round_number, match_controller.scores[0]]
 		if not melee_button.player.alive:
 			roles_label.text = "第 %d 小局 · 你已淘汰 · 等待人机决出胜者" % match_controller.round_number
+			if match_controller.scoring_mode == MATCH_SCRIPT.ScoringMode.KILLS:
+				roles_label.text = "第 %d 小局 · 你已淘汰 · 击杀得分 %d / 10" % [match_controller.round_number, match_controller.scores[0]]
 		elif living == 1:
-			roles_label.text = "保持存活 · %.1f 秒" % maxf(0.0, MATCH_SCRIPT.SURVIVOR_HOLD - match_controller.survivor_time)
+			var countdown: String = "小局即将结束" if match_controller.scoring_mode == MATCH_SCRIPT.ScoringMode.KILLS else "保持存活"
+			roles_label.text = "%s · %.1f 秒" % [countdown, maxf(0.0, MATCH_SCRIPT.SURVIVOR_HOLD - match_controller.survivor_time)]
+	if melee_button.player.alive:
+		if melee_button.player.attack_state == "aim":
+			roles_label.text += " · 瞄准中"
+		elif not melee_button.player.has_boomerang:
+			roles_label.text += " · 空手：拾回镖"
 
 
 func _respawn() -> void:
@@ -168,6 +198,7 @@ func _jump() -> void:
 func bind_player(actor: CharacterBody3D) -> void:
 	melee_button.player = actor
 	jump_button.player = actor
+	throw_button.player = actor
 
 
 func release_actions() -> void:
@@ -176,6 +207,7 @@ func release_actions() -> void:
 	melee_button.mouse_held = false
 	jump_button.touch_id = -1
 	jump_button.mouse_held = false
+	throw_button.cancel()
 
 
 func bind_match(controller: Node) -> void:
@@ -202,7 +234,9 @@ func _build_menus() -> void:
 	var introduction := _label("选好角色，进入岩石庭院。", 13)
 	introduction.set_meta("compact_hide", true)
 	content.add_child(introduction)
-	var settings := HBoxContainer.new()
+	var settings := GridContainer.new()
+	settings_grid = settings
+	settings.columns = 3
 	content.add_child(settings)
 	var count_column := VBoxContainer.new()
 	count_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -229,6 +263,16 @@ func _build_menus() -> void:
 		difficulty_choice.add_item(text)
 	difficulty_choice.item_selected.connect(_change_difficulty)
 	level_column.add_child(difficulty_choice)
+	var scoring_column := VBoxContainer.new()
+	scoring_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings.add_child(scoring_column)
+	scoring_column.add_child(_label("计分方式", 13))
+	scoring_choice = _choice()
+	scoring_choice.name = "ScoringMode"
+	for text in MATCH_SCRIPT.SCORING_NAMES:
+		scoring_choice.add_item(text)
+	scoring_choice.item_selected.connect(_change_scoring)
+	scoring_column.add_child(scoring_choice)
 	content.add_child(_label("参赛角色 · 可以选择相同角色", 13))
 	var scroll := ScrollContainer.new()
 	participants_scroll = scroll
@@ -267,9 +311,9 @@ func _build_menus() -> void:
 		selector.item_selected.connect(_change_role.bind(index))
 		line.add_child(selector)
 		role_selectors.append(selector)
-	var rules := _label("每局最后存活者 +1 分，全灭不加分。\n先到 10 分获胜，计分页点击进入下一局。", 12)
-	rules.set_meta("compact_hide", true)
-	content.add_child(rules)
+	rules_label = _label("", 12)
+	rules_label.set_meta("compact_hide", true)
+	content.add_child(rules_label)
 	start_button = _button("开始游戏", _start_match, true)
 	start_button.name = "StartMatch"
 	start_button.set_meta("css_height", 48.0)
@@ -291,7 +335,8 @@ func _build_menus() -> void:
 	score_list.columns = 1
 	score_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	score_scroll.add_child(score_list)
-	score_content.add_child(_label("当前累计分数 · 先到 10 分获胜", 12))
+	score_caption = _label("当前累计分数 · 先到 10 分获胜", 12)
+	score_content.add_child(score_caption)
 	var actions := HBoxContainer.new()
 	score_content.add_child(actions)
 	lobby_button = _button("返回设置", _return_to_lobby)
@@ -394,6 +439,11 @@ func _change_difficulty(index: int) -> void:
 	match_controller.configure(match_controller.bot_count, index, match_controller.role_choices)
 
 
+func _change_scoring(index: int) -> void:
+	match_controller.configure(match_controller.bot_count, match_controller.difficulty, match_controller.role_choices, index)
+	_refresh_lobby()
+
+
 func _change_role(role: int, seat: int) -> void:
 	var choices: Array[int] = match_controller.role_choices.duplicate()
 	choices[seat] = role
@@ -406,11 +456,15 @@ func _refresh_lobby() -> void:
 	minus_button.disabled = match_controller.bot_count <= 1
 	plus_button.disabled = match_controller.bot_count >= MATCH_SCRIPT.MAX_BOTS
 	difficulty_choice.select(match_controller.difficulty)
+	scoring_choice.select(match_controller.scoring_mode)
+	rules_label.text = "每击杀一名对手 +1 分，存活不额外加分。" if match_controller.scoring_mode == MATCH_SCRIPT.ScoringMode.KILLS else "每局最后存活者 +1 分，全灭不加分。"
+	rules_label.text += "\n先到 10 分获胜，计分页点击进入下一局。"
+	rules_label.text += "\n按住 L / 投掷瞄准，松开飞出；空手时先拾回镖。"
 	for index in range(role_selectors.size()):
 		seat_rows[index].visible = index <= match_controller.bot_count
 		var role: int = match_controller.role_choices[index]
 		role_selectors[index].select(role)
-		seat_badges[index].text = ["莓", "茄", "圈", "萝"][role]
+		seat_badges[index].text = MATCH_SCRIPT.ROLE_BADGES[role]
 		seat_badges[index].add_theme_color_override("font_color", MATCH_SCRIPT.ROLE_COLORS[role])
 	_layout_controls.call_deferred()
 
@@ -435,7 +489,7 @@ func _refresh_phase() -> void:
 	show()
 	var phase: String = match_controller.phase
 	var playing: bool = phase in ["playing", "practice"]
-	for control in [$Root/MapTitle, $Root/TopRight, roles_label, joystick, melee_button, jump_button, respawn_button]:
+	for control in [$Root/MapTitle, $Root/TopRight, roles_label, joystick, melee_button, jump_button, throw_button, respawn_button]:
 		control.visible = playing
 	overlay.visible = not playing
 	lobby_panel.visible = phase == "lobby"
@@ -459,23 +513,29 @@ func _show_scores() -> void:
 		score_list.remove_child(child)
 		child.queue_free()
 	var winner: int = match_controller.round_winner
+	var kill_scoring: bool = match_controller.scoring_mode == MATCH_SCRIPT.ScoringMode.KILLS
 	score_title.text = "第 %d 小局结束" % match_controller.round_number
 	score_result.text = "全员淘汰 · 本局不加分" if winner < 0 else "%s · %s存活，+1 分" % [match_controller.seat_name(winner), MATCH_SCRIPT.ROLE_NAMES[match_controller.role_choices[winner]]]
+	if kill_scoring:
+		score_result.text = "全员淘汰 · 已获击杀分保留" if winner < 0 else "击杀计分 · 存活者不额外加分"
+	score_caption.text = "%s · 当前累计分数 · 先到 10 分获胜" % MATCH_SCRIPT.SCORING_NAMES[match_controller.scoring_mode]
 	if match_controller.phase == "match_over":
 		score_title.text = "%s · %s获胜" % [match_controller.seat_name(match_controller.champion), MATCH_SCRIPT.ROLE_NAMES[match_controller.role_choices[match_controller.champion]]]
-		score_result.text = "率先得到 10 分 · 整场比赛结束"
+		score_result.text = "%s · 率先得到 10 分" % MATCH_SCRIPT.SCORING_NAMES[match_controller.scoring_mode]
 	next_button.text = "再玩一场" if match_controller.phase == "match_over" else "下一小局"
 	for index in range(match_controller.scores.size()):
 		var role: int = match_controller.role_choices[index]
 		var color: Color = MATCH_SCRIPT.ROLE_COLORS[role]
+		var gained: int = match_controller.round_points[index]
+		var highlighted: bool = gained > 0 if kill_scoring else index == winner
 		var row := PanelContainer.new()
 		row.name = "ScoreSeat%d" % index
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.set_meta("css_height", 72.0)
 		row.set_meta("css_compact_height", 58.0)
-		var style: StyleBoxFlat = _style(Color("f7fbf1").lerp(color, 0.12 if index == winner else 0.035), 10, 10)
+		var style: StyleBoxFlat = _style(Color("f7fbf1").lerp(color, 0.12 if highlighted else 0.035), 10, 10)
 		score_styles.append(style)
-		if index == winner:
+		if highlighted:
 			style.border_color = color
 			style.set_border_width_all(2)
 		row.add_theme_stylebox_override("panel", style)
@@ -488,8 +548,9 @@ func _show_scores() -> void:
 		var seat := _label("%s · %s" % [match_controller.seat_name(index), MATCH_SCRIPT.ROLE_NAMES[role]], 14)
 		seat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		line.add_child(seat)
-		if index == winner:
-			var added := _label("+1", 14)
+		if gained > 0:
+			var added := _label("+%d" % gained, 14)
+			added.name = "RoundGain"
 			added.add_theme_color_override("font_color", color)
 			line.add_child(added)
 		line.add_child(_label("%d / 10" % match_controller.scores[index], 20))
@@ -504,6 +565,7 @@ func _show_scores() -> void:
 
 func _layout_menus(pixels: Vector2, logical: Vector2, unit: float) -> void:
 	var compact: bool = pixels.y < 520.0
+	settings_grid.columns = 2 if pixels.x < 560.0 else 3
 	seat_grid.columns = 2 if compact and pixels.x > 640.0 else 1
 	score_list.columns = seat_grid.columns
 	root.theme.default_font_size = roundi(14.0 * unit)
@@ -558,13 +620,13 @@ func verification_state() -> Dictionary:
 	var actors: Array = []
 	for index in range(get_parent().combat.actors.size()):
 		var actor: CharacterBody3D = get_parent().combat.actors[index]
-		actors.append({"seat": index, "role": actor.get_meta("role", index), "alive": actor.alive, "position": [actor.position.x, actor.position.y, actor.position.z], "attack_state": actor.attack_state, "round_active": actor.round_active})
-	return {"phase": match_controller.phase, "bot_count": match_controller.bot_count, "difficulty": match_controller.difficulty, "roles": match_controller.role_choices, "scores": match_controller.scores, "round": match_controller.round_number, "winner": match_controller.round_winner, "champion": match_controller.champion, "survivor_time": match_controller.survivor_time, "actors": actors,
-		"controls": {"minus": _screen_rect(minus_button, ratio), "plus": _screen_rect(plus_button, ratio), "difficulty": _screen_rect(difficulty_choice, ratio), "roles": selectors, "start": _screen_rect(start_button, ratio), "next": _screen_rect(next_button, ratio), "lobby": _screen_rect(lobby_button, ratio), "settings": _screen_rect(respawn_button, ratio), "joystick": _screen_rect(joystick, ratio), "attack": _screen_rect(melee_button, ratio), "jump": _screen_rect(jump_button, ratio), "panel": _screen_rect(lobby_panel if match_controller.phase == "lobby" else score_panel, ratio), "participants": _screen_rect(participants_scroll, ratio), "scores_scroll": _screen_rect(scores_scroll, ratio), "popup": _popup_state(ratio)}, "title": score_title.text, "result": score_result.text}
+		actors.append({"seat": index, "role": actor.get_meta("role", index), "alive": actor.alive, "position": [actor.position.x, actor.position.y, actor.position.z], "attack_state": actor.attack_state, "round_active": actor.round_active, "has_boomerang": actor.has_boomerang, "throw_id": actor.throw_id})
+	return {"phase": match_controller.phase, "bot_count": match_controller.bot_count, "difficulty": match_controller.difficulty, "scoring_mode": match_controller.scoring_mode, "round_points": match_controller.round_points, "roles": match_controller.role_choices, "scores": match_controller.scores, "round": match_controller.round_number, "winner": match_controller.round_winner, "champion": match_controller.champion, "survivor_time": match_controller.survivor_time, "actors": actors,
+		"controls": {"minus": _screen_rect(minus_button, ratio), "plus": _screen_rect(plus_button, ratio), "difficulty": _screen_rect(difficulty_choice, ratio), "scoring": _screen_rect(scoring_choice, ratio), "roles": selectors, "start": _screen_rect(start_button, ratio), "next": _screen_rect(next_button, ratio), "lobby": _screen_rect(lobby_button, ratio), "settings": _screen_rect(respawn_button, ratio), "joystick": _screen_rect(joystick, ratio), "attack": _screen_rect(melee_button, ratio), "jump": _screen_rect(jump_button, ratio), "panel": _screen_rect(lobby_panel if match_controller.phase == "lobby" else score_panel, ratio), "participants": _screen_rect(participants_scroll, ratio), "scores_scroll": _screen_rect(scores_scroll, ratio), "popup": _popup_state(ratio)}, "title": score_title.text, "result": score_result.text, "rules": rules_label.text}
 
 
 func _popup_state(ratio: Vector2) -> Dictionary:
-	var choices: Array[OptionButton] = [difficulty_choice]
+	var choices: Array[OptionButton] = [difficulty_choice, scoring_choice]
 	choices.append_array(role_selectors)
 	for choice in choices:
 		var popup: PopupMenu = choice.get_popup()

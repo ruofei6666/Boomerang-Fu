@@ -18,17 +18,17 @@
   
 </head>
 <body>
-  <canvas id="canvas" tabindex="0" aria-label="3D水果乱斗：设置人机与角色后开始；WASD走动、J跳斩、K跳跃，手机使用摇杆和动作图标；先到10分获胜"></canvas>
+  <canvas id="canvas" tabindex="0" aria-label="3D水果乱斗：设置人机、角色和计分方式后开始；WASD走动、J跳斩、K跳跃；按住L或手机投掷图标原地瞄准，用WASD或摇杆转向，松开投掷，停住后走近拾回；先到10分获胜"></canvas>
   <div id="loading">
     <h1>水果乱斗</h1>
     <p>正在准备食物角色和岩石庭院…</p>
     <progress id="progress"></progress>
-    <p>选择角色与人机 · 每局最后存活者得分 · 先到 10 分获胜</p>
+    <p>选择击杀计分或存活加分 · 先到 10 分获胜</p>
     <p id="error" hidden></p>
   </div>
   <script src="index.js"></script>
   <script>
-    const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":913624,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
+    const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1856532,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
     const progress = document.getElementById('progress');
     const canvas = document.getElementById('canvas');
     document.addEventListener('touchmove', event => event.preventDefault(), { passive: false });

@@ -1,11 +1,13 @@
 extends RefCounted
-## 四个角色共用的双圆手与圆角 V 形回旋镖；挂在身体下，自动跟随步态和转身。
+## 食物角色共用的双圆手与圆角 V 形回旋镖；挂在身体下，自动跟随步态和转身。
 
 const PALETTES: Dictionary = {
 	"strawberry": {"hand": Color("ffb3c1"), "blade": Color("f34758"), "accent": Color("98cf4b"), "at": Vector3(0.86, 1.24, 0.30)},
 	"eggplant": {"hand": Color("c9b2f0"), "blade": Color("7549ad"), "accent": Color("96ca4e"), "at": Vector3(0.80, 1.30, 0.27)},
-	"donut": {"hand": Color("ffcfb1"), "blade": Color("ff9dbb"), "accent": Color("fff2b4"), "at": Vector3(1.00, 1.40, 0.20)},
+	"pumpkin": {"hand": Color("ffca8d"), "blade": Color("f29a38"), "accent": Color("83b84c"), "at": Vector3(1.02, 1.24, 0.30)},
 	"carrot": {"hand": Color("ffc77d"), "blade": Color("f99432"), "accent": Color("96ca4e"), "at": Vector3(0.67, 1.26, 0.27)},
+	"blueberry": {"hand": Color("bbcafa"), "blade": Color("637ed6"), "accent": Color("b4a4f0"), "at": Vector3(0.96, 1.24, 0.28)},
+	"watermelon": {"hand": Color("bfe695"), "blade": Color("f35b6c"), "accent": Color("6bb54a"), "at": Vector3(0.91, 1.25, 0.30)},
 }
 const LENGTH_SEGMENTS: int = 48
 const RADIAL_SEGMENTS: int = 12
@@ -34,7 +36,7 @@ func attach(body: Node3D, kind: String) -> void:
 	_mesh(hand, "Palm", sphere, palm_material)
 	var boomerang := Node3D.new()
 	boomerang.name = "Boomerang"
-	# 圆手覆盖回旋镖的弯折握持处，两翼朝身体外侧伸出，避开脸和甜甜圈的孔。
+	# 圆手覆盖回旋镖的弯折握持处，两翼朝身体外侧伸出，避开五官。
 	boomerang.position = Vector3(0.0, 0.0, -0.075)
 	boomerang.rotation = Vector3(-0.12, -0.16, 0.10)
 	hand.add_child(boomerang)

@@ -1,7 +1,10 @@
 extends Node3D
 ## 先判定玩家对刀，再收集同帧命中；人机互砍按出刀先后结算。
 
+signal character_eliminated(attacker: CharacterBody3D, victim: CharacterBody3D)
+
 const EFFECTS = preload("res://scripts/combat_effects.gd")
+const PROJECTILE = preload("res://scripts/boomerang_projectile.gd")
 const SLASH = preload("res://assets/audio/slash.wav")
 const CLASH = preload("res://assets/audio/clash.wav")
 const SLICE = preload("res://assets/audio/slice.wav")
@@ -16,10 +19,17 @@ var kills: int = 0
 var clashes: int = 0
 var enabled: bool = true
 var navigation: AStarGrid2D
+var projectiles: Array[CharacterBody3D] = []
+var throw_range: float = 38.0
 
 
 func _ready() -> void:
 	process_physics_priority = 100
+	var ground: Node = get_parent().find_child("GroundCollision", true, false)
+	if is_instance_valid(ground) and ground.get_child_count() > 0:
+		var shape: CollisionShape3D = ground.get_child(0) as CollisionShape3D
+		if shape and shape.shape is BoxShape3D:
+			throw_range = maxf(shape.shape.size.x, shape.shape.size.z)
 	effects = Node3D.new()
 	effects.name = "CombatEffects"
 	effects.set_script(EFFECTS)
@@ -32,13 +42,16 @@ func _ready() -> void:
 				player = actor
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if not enabled:
 		return
 	for actor in actors:
 		if actor.attack_requested and actor.alive:
 			actor.begin_attack()
 	resolve_hits()
+	for weapon in projectiles.duplicate():
+		if enabled and is_instance_valid(weapon):
+			weapon.advance(delta)
 
 
 func resolve_hits() -> void:
@@ -86,6 +99,9 @@ func resolve_hits() -> void:
 		return first.initiative > second.initiative
 	)
 	for hit in hits:
+		# 达到整场胜利分数时立即停止，后续命中不再属于这场比赛。
+		if not enabled:
+			break
 		var attacker: CharacterBody3D = hit.attacker
 		var victim: CharacterBody3D = hit.target
 		if not victim.alive:
@@ -94,10 +110,79 @@ func resolve_hits() -> void:
 		if attacker.is_in_group("wanderers") and victim.is_in_group("wanderers") and not attacker.alive:
 			continue
 		attacker.hit_targets[victim.get_instance_id()] = true
-		effects.slice(victim, hit.direction)
-		play_sound("slice", victim.global_position)
-		victim.die()
-		kills += 1
+		eliminate(attacker, victim, hit.direction)
+
+
+func eliminate(attacker: CharacterBody3D, victim: CharacterBody3D, direction: Vector3) -> void:
+	if not enabled or not victim.alive:
+		return
+	effects.slice(victim, direction)
+	play_sound("slice", victim.global_position)
+	victim.die()
+	kills += 1
+	character_eliminated.emit(attacker, victim)
+
+
+func launch_boomerang(actor: CharacterBody3D, direction: Vector3) -> CharacterBody3D:
+	if not enabled or not actor.alive or not actor.round_active or not actor.has_boomerang:
+		return null
+	var weapon := CharacterBody3D.new()
+	weapon.set_script(PROJECTILE)
+	weapon.name = "ThrownBoomerang%d" % (actor.throw_id + 1)
+	weapon.owner_actor = actor
+	weapon.combat = self
+	weapon.direction = direction.normalized()
+	weapon.flight_range = throw_range
+	weapon.position = to_local(actor.global_position + Vector3.UP * 1.1)
+	add_child(weapon)
+	projectiles.append(weapon)
+	return weapon
+
+
+func resolve_projectile_segment(weapon: CharacterBody3D, from: Vector3, to: Vector3) -> void:
+	var motion: Vector3 = to - from
+	for actor in actors:
+		if not enabled:
+			break
+		if actor == weapon.owner_actor or not actor.alive or actor.get_instance_id() in weapon.hit_targets:
+			continue
+		var collider: CollisionShape3D = actor.get_node("BodyCollision")
+		var center: Vector3 = collider.global_position
+		var amount: float = clampf((center - from).dot(motion) / maxf(motion.length_squared(), 0.000001), 0.0, 1.0)
+		var radius: float = collider.shape.radius + weapon.RADIUS
+		if center.distance_to(from + motion * amount) <= radius:
+			weapon.hit_targets[actor.get_instance_id()] = true
+			eliminate(weapon.owner_actor, actor, weapon.direction)
+
+
+func clear_point_path(actor: CharacterBody3D, point: Vector3) -> bool:
+	var query := PhysicsRayQueryParameters3D.create(actor.global_position + Vector3.UP * 1.1, Vector3(point.x, actor.global_position.y + 1.1, point.z))
+	var excluded: Array[RID] = []
+	for other in actors:
+		excluded.append(other.get_rid())
+	query.exclude = excluded
+	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+
+
+func remove_boomerang(weapon: CharacterBody3D) -> void:
+	projectiles.erase(weapon)
+	weapon.queue_free()
+
+
+func reclaim_boomerang(actor: CharacterBody3D) -> void:
+	for weapon in projectiles.duplicate():
+		if is_instance_valid(weapon) and weapon.owner_actor == actor:
+			remove_boomerang(weapon)
+	actor.thrown_boomerang = null
+
+
+func clear_boomerangs() -> void:
+	for weapon in projectiles:
+		if is_instance_valid(weapon):
+			if is_instance_valid(weapon.owner_actor):
+				weapon.owner_actor.thrown_boomerang = null
+			weapon.queue_free()
+	projectiles.clear()
 
 
 func _attacking(actor: CharacterBody3D) -> bool:
@@ -131,9 +216,12 @@ func play_sound(kind: String, at: Vector3) -> void:
 
 
 func reset_round() -> void:
+	clear_boomerangs()
 	effects.clear()
 	for actor in actors:
 		actor.reset_character()
+		if actor.is_in_group("wanderers"):
+			actor.reset_round_dodges()
 
 
 func build_navigation() -> void:

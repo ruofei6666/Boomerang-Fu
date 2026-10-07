@@ -3,7 +3,7 @@ extends SceneTree
 
 var checks: Array[String] = []
 var failures: Array[String] = []
-var actor_names: Array[String] = ["EggplantNPC", "DonutNPC", "CarrotNPC"]
+var actor_names: Array[String] = ["EggplantNPC", "PumpkinNPC", "CarrotNPC", "BlueberryNPC", "WatermelonNPC"]
 
 
 func _initialize() -> void:
@@ -59,9 +59,9 @@ func _verify() -> void:
 	await process_frame
 	await _frames(18)
 	var player: CharacterBody3D = arena.get_node("StrawberryPlayer")
-	_check(get_nodes_in_group("food_characters").size() == 4, "Four food characters share the arena")
+	_check(get_nodes_in_group("food_characters").size() == 6, "Six food characters share the arena")
 	_check(get_nodes_in_group("player").size() == 1 and get_first_node_in_group("player") == player, "Only the strawberry belongs to the player group")
-	_check(get_nodes_in_group("wanderers").size() == 3, "Exactly three autonomous food characters")
+	_check(get_nodes_in_group("wanderers").size() == 5, "Exactly five autonomous food characters")
 	var resting_positions: Array[Vector3] = []
 	for actor in actors:
 		_check(actor.is_on_floor() and not _inside_rock(actor), "%s spawns on clear ground" % actor.name)
@@ -84,9 +84,15 @@ func _verify() -> void:
 	for actor in actors:
 		_check(Vector2(actor.velocity.x, actor.velocity.z).length() > 0.5, "%s walks without keyboard or touch input" % actor.name)
 		_check(actor.walk_phase > 0.1 and actor.animation_weight > 0.1, "%s animates its feet and body while walking" % actor.name)
-	var distances: Array[float] = [0.0, 0.0, 0.0]
-	var saw_idle: Array[bool] = [false, false, false]
-	var saw_turn: Array[bool] = [false, false, false]
+	var distances: Array[float] = []
+	var saw_idle: Array[bool] = []
+	var saw_turn: Array[bool] = []
+	distances.resize(actors.size())
+	distances.fill(0.0)
+	saw_idle.resize(actors.size())
+	saw_idle.fill(false)
+	saw_turn.resize(actors.size())
+	saw_turn.fill(false)
 	var previous: Array[Vector3] = []
 	var headings: Array[float] = []
 	for actor in actors:

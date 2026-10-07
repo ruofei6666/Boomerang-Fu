@@ -67,7 +67,7 @@ func _verify() -> void:
 	root.size = Vector2i(1440, 810)
 	arena = load("res://scenes/stone_arena.tscn").instantiate()
 	arena.verification_mode = true
-	for name in ["EggplantNPC", "DonutNPC", "CarrotNPC"]:
+	for name in ["EggplantNPC", "PumpkinNPC", "CarrotNPC", "BlueberryNPC", "WatermelonNPC"]:
 		arena.get_node(name).melee_enabled = false
 	root.add_child(arena)
 	await process_frame
@@ -75,7 +75,7 @@ func _verify() -> void:
 	player = arena.get_node("StrawberryPlayer")
 	target = arena.get_node("EggplantNPC")
 	combat = arena.combat
-	_check(combat.actors.size() == 4 and combat.player == player, "All four characters use one combat resolver")
+	_check(combat.actors.size() == 6 and combat.player == player, "All six characters use one combat resolver")
 	_check(combat.SLASH.get_length() > 0.20 and combat.SLASH.get_length() < 0.25, "Slash uses the approved short video clip")
 	_check(combat.CLASH.get_length() > 0.05 and combat.SLICE.get_length() > 0.05, "Clash and fruit slice audio resources load")
 	_pair()
@@ -207,7 +207,7 @@ func _verify() -> void:
 				actor_dots += 1
 				color_matches = color_matches and item.node.material_override.albedo_color.is_equal_approx(combat.effects.COLORS[String(actor.name)])
 		_check(color_matches, "%s blood dots retain their character color" % actor.name)
-		_check(actor_halves == 2 and actor_dots == 26 and actor_caps >= (4 if actor.name == "DonutNPC" else 2), "%s splits into two capped halves, preserving the donut hole" % actor.name)
+		_check(actor_halves == 2 and actor_dots == 26 and actor_caps == 2, "%s splits into two solid capped halves" % actor.name)
 	# 粒子色已经逐个检查；真实敌人也必须能触发砍击和死亡。
 	combat.effects.clear()
 	_pair(2.6, true)
@@ -222,7 +222,7 @@ func _verify() -> void:
 		if actor.is_in_group("wanderers"):
 			actor.melee_enabled = false
 		restored = restored and actor.alive and actor.visual.visible and actor.collision_layer != 0 and actor.position.is_equal_approx(actor.spawn_position)
-	_check(restored, "Restart revives all four characters at their own spawn positions")
+	_check(restored, "Restart revives all six characters at their own spawn positions")
 	# 在同一条空路上实测两种动作，独立跳跃必须恰好是砍击前移的两倍。
 	_pair(-2.6)
 	await _frames(4)
@@ -399,7 +399,7 @@ func _verify() -> void:
 	_check(player.jump_id == jump_id and player.attack_state == "idle", "Losing focus blocks keyboard and touch jump requests")
 	player._notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_IN)
 	# 用真实跳斩验证人机互砍，双方同时或先后出刀都只能淘汰一个。
-	var second_bot: CharacterBody3D = arena.get_node("DonutNPC")
+	var second_bot: CharacterBody3D = arena.get_node("PumpkinNPC")
 	for reversed_order in [false, true]:
 		for delay in [0, 3]:
 			_pair(3.0, true)

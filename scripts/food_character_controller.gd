@@ -40,6 +40,11 @@ var slash_visual: MeshInstance3D
 var slash_material: StandardMaterial3D
 var right_hand: Node3D
 var held_boomerang: Node3D
+var has_boomerang: bool = true
+var thrown_boomerang: CharacterBody3D
+var throw_direction := Vector3.FORWARD
+var throw_id: int = 0
+var aim_visual: MeshInstance3D
 
 const HOP_TIME: float = 0.16
 const HOP_DISTANCE: float = 2.85
@@ -62,6 +67,7 @@ func _ready() -> void:
 	hand_rotation_rest = right_hand.rotation
 	boomerang_rotation_rest = held_boomerang.rotation
 	_make_slash_visual()
+	_make_aim_visual()
 
 
 func movement_direction(_delta: float) -> Vector3:
@@ -126,6 +132,10 @@ func _animate_walk(delta: float, actual_speed: float, traveled: float) -> void:
 
 
 func reset_character() -> void:
+	if is_instance_valid(combat):
+		combat.reclaim_boomerang(self)
+	has_boomerang = true
+	thrown_boomerang = null
 	alive = true
 	attack_state = "idle"
 	attack_requested = false
@@ -148,7 +158,7 @@ func reset_character() -> void:
 
 
 func request_attack() -> bool:
-	if not round_active or not alive or attack_state != "idle" or attack_requested:
+	if not round_active or not alive or not has_boomerang or attack_state != "idle" or attack_requested:
 		return false
 	attack_requested = true
 	return true
@@ -174,7 +184,7 @@ func facing_direction() -> Vector3:
 
 func begin_attack() -> void:
 	attack_requested = false
-	if not round_active or not alive or attack_state != "idle":
+	if not round_active or not alive or not has_boomerang or attack_state != "idle":
 		return
 	attack_origin = global_position
 	attack_direction = facing_direction()
@@ -187,6 +197,9 @@ func begin_attack() -> void:
 
 
 func _process_attack(delta: float) -> void:
+	if attack_state == "aim":
+		_process_aim(delta)
+		return
 	if attack_state == "jump":
 		_process_jump(delta)
 		return
@@ -279,6 +292,7 @@ func die() -> void:
 	collision_mask = 0
 	visual.hide()
 	slash_visual.hide()
+	aim_visual.hide()
 
 
 func _reset_weapon_pose() -> void:
@@ -286,9 +300,97 @@ func _reset_weapon_pose() -> void:
 		right_hand.position = hand_rest
 		right_hand.rotation = hand_rotation_rest
 		held_boomerang.rotation = boomerang_rotation_rest
+		held_boomerang.visible = has_boomerang
 		body_visual.rotation = Vector3.ZERO
 	if is_instance_valid(slash_visual):
 		slash_visual.hide()
+	if is_instance_valid(aim_visual):
+		aim_visual.hide()
+
+
+func request_throw() -> bool:
+	if not round_active or not alive or not has_boomerang or attack_state != "idle" or attack_requested or not is_instance_valid(combat):
+		return false
+	attack_state = "aim"
+	throw_direction = facing_direction()
+	velocity = Vector3.ZERO
+	_animate_walk(1.0, 0.0, 0.0)
+	_process_aim(0.0)
+	return true
+
+
+func aim_direction(_delta: float) -> Vector3:
+	return throw_direction
+
+
+func _process_aim(delta: float) -> void:
+	velocity = Vector3.ZERO
+	var direction: Vector3 = aim_direction(delta)
+	direction.y = 0.0
+	if not direction.is_zero_approx():
+		throw_direction = direction.normalized()
+	visual.rotation.y = atan2(throw_direction.x, throw_direction.z)
+	right_hand.rotation.y = hand_rotation_rest.y - 0.75
+	aim_visual.show()
+
+
+func release_throw() -> bool:
+	if attack_state != "aim" or not alive or not round_active or not has_boomerang or not is_instance_valid(combat):
+		cancel_throw()
+		return false
+	# 快速按下方向键后直接松 L，也采样当前方向，不必等下一物理帧。
+	var direction: Vector3 = aim_direction(0.0)
+	direction.y = 0.0
+	if not direction.is_zero_approx():
+		throw_direction = direction.normalized()
+	visual.rotation.y = atan2(throw_direction.x, throw_direction.z)
+	thrown_boomerang = combat.launch_boomerang(self, throw_direction)
+	if not is_instance_valid(thrown_boomerang):
+		cancel_throw()
+		return false
+	has_boomerang = false
+	throw_id += 1
+	attack_state = "idle"
+	velocity = Vector3.ZERO
+	_reset_weapon_pose()
+	combat.play_sound("slash", global_position)
+	return true
+
+
+func cancel_throw() -> void:
+	if attack_state == "aim":
+		attack_state = "idle"
+		velocity = Vector3.ZERO
+		_reset_weapon_pose()
+
+
+func pickup_boomerang(weapon: CharacterBody3D) -> void:
+	if weapon != thrown_boomerang:
+		return
+	thrown_boomerang = null
+	has_boomerang = true
+	_reset_weapon_pose()
+
+
+func _make_aim_visual() -> void:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var points: Array[Vector3] = [Vector3(-0.06, 0, 1.25), Vector3(0.06, 0, 1.25), Vector3(-0.06, 0, 3.0), Vector3(0.06, 0, 3.0), Vector3(-0.30, 0, 2.85), Vector3(0.30, 0, 2.85), Vector3(0, 0, 3.40)]
+	for index in [0, 2, 1, 1, 2, 3, 4, 6, 5]:
+		surface.set_normal(Vector3.UP)
+		surface.add_vertex(points[index])
+	aim_visual = MeshInstance3D.new()
+	aim_visual.name = "ThrowAim"
+	aim_visual.mesh = surface.commit()
+	aim_visual.position.y = 0.05
+	aim_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.albedo_color = Color("21483b")
+	aim_visual.material_override = material
+	visual.add_child(aim_visual)
+	aim_visual.hide()
 
 
 func _make_slash_visual() -> void:

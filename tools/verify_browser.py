@@ -53,7 +53,7 @@ def main():
         load(page)
         check(page.locator("#loading").count() == 0, "Browser game finishes loading")
         first = state(page)
-        check({actor["name"] for actor in first["wanderers"]} == {"EggplantNPC", "DonutNPC", "CarrotNPC"}, "Web build contains all three food NPCs")
+        check({actor["name"] for actor in first["wanderers"]} == {"EggplantNPC", "PumpkinNPC", "CarrotNPC", "BlueberryNPC", "WatermelonNPC"}, "Web build contains all five food NPCs")
         frames(page, 240)
         wandered = state(page)
         for initial, actor in zip(first["wanderers"], wandered["wanderers"]):

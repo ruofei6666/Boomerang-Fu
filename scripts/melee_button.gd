@@ -54,7 +54,7 @@ func _process(_delta: float) -> void:
 
 
 func _action_ready() -> bool:
-	return is_instance_valid(player) and player.alive and player.has_focus and not player.attack_requested and (player.attack_state == "idle" or (player.attack_state == "jump" and not player.attack_buffered))
+	return is_instance_valid(player) and player.alive and player.has_focus and player.has_boomerang and not player.attack_requested and (player.attack_state == "idle" or (player.attack_state == "jump" and not player.attack_buffered))
 
 
 func _draw() -> void:

@@ -12,6 +12,7 @@ var report_timer: float = 0.0
 var web_blur_callback: JavaScriptObject
 var web_focus_callback: JavaScriptObject
 var web_visibility_callback: JavaScriptObject
+var web_touch_cancel_callback: JavaScriptObject
 var web_window: JavaScriptObject
 var web_canvas: JavaScriptObject
 var combat: Node3D
@@ -50,9 +51,12 @@ func _ready() -> void:
 		web_blur_callback = JavaScriptBridge.create_callback(_web_blur)
 		web_focus_callback = JavaScriptBridge.create_callback(_web_focus)
 		web_visibility_callback = JavaScriptBridge.create_callback(_web_visibility)
+		web_touch_cancel_callback = JavaScriptBridge.create_callback(_web_touch_cancel)
 		browser_window.addEventListener("blur", web_blur_callback)
 		browser_window.addEventListener("focus", web_focus_callback)
 		browser_document.addEventListener("visibilitychange", web_visibility_callback)
+		# Web 的 touchcancel 被引擎转换为普通松手；先取消对应动作，避免误投。
+		browser_document.addEventListener("touchcancel", web_touch_cancel_callback, true)
 	match_controller = Node.new()
 	match_controller.name = "Match"
 	match_controller.set_script(MATCH_SCRIPT)
@@ -108,6 +112,10 @@ func _process(delta: float) -> void:
 	var center: Vector2 = (stick.global_position + stick.size * 0.5) * screen_ratio
 	var wanderers: Array[Dictionary] = []
 	for actor in get_tree().get_nodes_in_group("wanderers"):
+		var dodge_counts: Dictionary = {}
+		for opponent in combat.actors:
+			if opponent != actor:
+				dodge_counts[str(opponent.name)] = actor.dodge_count_against(opponent)
 		wanderers.append({
 			"name": actor.name,
 			"position": [actor.position.x, actor.position.y, actor.position.z],
@@ -118,6 +126,10 @@ func _process(delta: float) -> void:
 			"attack_state": actor.attack_state,
 			"jump_id": actor.jump_id,
 			"jump_reason": actor.last_jump_reason,
+			"dodges_by_opponent": dodge_counts,
+			"attack_id": actor.attack_id,
+			"has_boomerang": actor.has_boomerang,
+			"throw_id": actor.throw_id,
 			"jump_height": actor.visual.position.y
 		})
 	var state := {
@@ -137,6 +149,11 @@ func _process(delta: float) -> void:
 		"alive": player.alive,
 		"attack_state": player.attack_state,
 		"attack_id": player.attack_id,
+		"has_boomerang": player.has_boomerang,
+		"throw_id": player.throw_id,
+		"throw_direction": [player.throw_direction.x, player.throw_direction.z],
+		"throw_touch": $Interface.throw_button.touch_id,
+		"aim_visible": player.aim_visual.visible,
 		"attack_buffered": player.attack_buffered,
 		"jump_id": player.jump_id,
 		"jump_origin": [player.jump_origin.x, player.jump_origin.y, player.jump_origin.z],
@@ -153,15 +170,21 @@ func _process(delta: float) -> void:
 		"attack_radius": $Interface.melee_button.size.x * 0.5 * screen_ratio.x,
 		"jump_button": [($Interface.jump_button.global_position.x + $Interface.jump_button.size.x * 0.5) * screen_ratio.x, ($Interface.jump_button.global_position.y + $Interface.jump_button.size.y * 0.5) * screen_ratio.y],
 		"jump_radius": $Interface.jump_button.size.x * 0.5 * screen_ratio.x,
+		"throw_button": [($Interface.throw_button.global_position.x + $Interface.throw_button.size.x * 0.5) * screen_ratio.x, ($Interface.throw_button.global_position.y + $Interface.throw_button.size.y * 0.5) * screen_ratio.y],
+		"throw_radius": $Interface.throw_button.size.x * 0.5 * screen_ratio.x,
 		"wanderers": wanderers,
 		"viewport": [logical.x, logical.y]
 	}
 	state["match"] = $Interface.verification_state()
+	var weapons: Array[Dictionary] = []
+	for weapon in combat.projectiles:
+		weapons.append({"owner": weapon.owner_actor.name, "position": [weapon.position.x, weapon.position.y, weapon.position.z], "direction": [weapon.direction.x, weapon.direction.z], "flying": weapon.flying, "distance": weapon.distance_traveled, "range": weapon.flight_range, "speed": weapon.velocity.length(), "bounces": weapon.bounce_count})
+	state["projectiles"] = weapons
 	web_canvas.setAttribute("data-game-state", JSON.stringify(state))
 
 
 func _run_match_test_command() -> void:
-	# 仅专用验证链接开放死亡注入；计时、计分和页面按钮仍走真实比赛逻辑。
+	# 仅专用验证链接开放死亡注入和布置命中；计分与命中结算仍走真实逻辑。
 	var raw: String = str(web_canvas.getAttribute("data-match-command"))
 	if raw.is_empty() or raw == "<null>" or raw == "null":
 		return
@@ -173,17 +196,48 @@ func _run_match_test_command() -> void:
 		for index in command.get("seats", []):
 			if int(index) >= 0 and int(index) < combat.actors.size():
 				combat.actors[int(index)].die()
+	elif command.get("action") == "strike":
+		var seat: int = int(command.get("attacker", -1))
+		var raw_targets: Variant = command.get("targets", [])
+		if not raw_targets is Array:
+			return
+		var targets: Array[int] = []
+		if seat < 0 or seat >= combat.actors.size() or not combat.actors[seat].alive:
+			return
+		for raw_target in raw_targets:
+			if not (raw_target is int or raw_target is float):
+				return
+			var target: int = int(raw_target)
+			if target < 0 or target >= combat.actors.size() or target == seat or not combat.actors[target].alive:
+				return
+			targets.append(target)
+		for index in range(combat.actors.size()):
+			var actor: CharacterBody3D = combat.actors[index]
+			actor.set_physics_process(false)
+			actor.velocity = Vector3.ZERO
+			actor.attack_state = "idle"
+			actor.hit_targets.clear()
+			actor.position = Vector3(-12.0 + index * 4.0, 0.08, 8.0)
+		var attacker: CharacterBody3D = combat.actors[seat]
+		attacker.position = Vector3(0.0, 0.08, 5.0)
+		for index in range(targets.size()):
+			combat.actors[targets[index]].position = Vector3((index - (targets.size() - 1) * 0.5) * 1.8, 0.08, 3.5)
+		attacker.attack_state = "swing"
+		attacker.attack_direction = Vector3.FORWARD
+		attacker.attack_time = 0.07
 
 
 func _web_blur(_arguments: Array) -> void:
 	player.has_focus = false
 	player.attack_requested = false
 	player.attack_buffered = false
+	player.cancel_throw()
+	$Interface.release_actions()
 	player.velocity = Vector3.ZERO
 	player.joystick.release()
 	camera_rig._end_drag()
 	# 浏览器外松开按键时收不到 keyup；主动释放，回来后不会继续走。
-	for code in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_Q, KEY_E, KEY_J, KEY_K]:
+	for code in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_Q, KEY_E, KEY_J, KEY_K, KEY_L]:
 		var released := InputEventKey.new()
 		released.keycode = code
 		released.physical_keycode = code
@@ -193,6 +247,21 @@ func _web_blur(_arguments: Array) -> void:
 
 func _web_focus(_arguments: Array) -> void:
 	player.has_focus = true
+
+
+func _web_touch_cancel(arguments: Array) -> void:
+	var touches: JavaScriptObject = arguments[0].changedTouches
+	var ui: CanvasLayer = $Interface
+	for index in range(int(touches.length)):
+		var identifier: int = int(touches.item(index).identifier)
+		if ui.throw_button.touch_id == identifier:
+			ui.throw_button.touch_id = -1
+			player.release_throw_control("touch", true)
+		if ui.joystick.active_touch == identifier:
+			ui.joystick.release()
+		for button in [ui.melee_button, ui.jump_button]:
+			if button.touch_id == identifier:
+				button.touch_id = -1
 
 
 func _web_visibility(_arguments: Array) -> void:

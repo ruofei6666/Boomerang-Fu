@@ -34,7 +34,7 @@ func _pair(opposite: bool = false) -> void:
 			actor.idle_time = 9999.0
 			actor.walking = false
 		if actor != player and actor != target:
-			actor.position = Vector3(-4.5 if actor.name == "DonutNPC" else 4.5, 0.01, 7.8)
+			actor.position = Vector3(-7.0 + float(arena.combat.actors.find(actor)) * 2.8, 0.01, 9.0)
 			actor.set_physics_process(false)
 	player.position = Vector3(-1.3, 0.01, 6.0)
 	player.visual.rotation.y = PI * 0.5
@@ -46,7 +46,7 @@ func _capture() -> void:
 	root.size = Vector2i(1440, 810)
 	arena = load("res://scenes/stone_arena.tscn").instantiate()
 	arena.verification_mode = true
-	for name in ["EggplantNPC", "DonutNPC", "CarrotNPC"]:
+	for name in ["EggplantNPC", "PumpkinNPC", "CarrotNPC", "BlueberryNPC", "WatermelonNPC"]:
 		arena.get_node(name).melee_enabled = false
 	root.add_child(arena)
 	await process_frame

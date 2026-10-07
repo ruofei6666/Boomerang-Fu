@@ -2,8 +2,8 @@ extends Node3D
 ## 保留原角色网格和配色，用切面裁出两半，并封住切口；碎块和圆点独立飞散。
 
 const CUT_SHADER = preload("res://assets/effects/cut_half.gdshader")
-const COLORS := {"StrawberryPlayer": Color("f34758"), "EggplantNPC": Color("7549ad"), "DonutNPC": Color("ff9dbb"), "CarrotNPC": Color("f99432")}
-const ROLE_COLORS: Array[Color] = [Color("f34758"), Color("7549ad"), Color("ff9dbb"), Color("f99432")]
+const COLORS := {"StrawberryPlayer": Color("f34758"), "EggplantNPC": Color("7549ad"), "PumpkinNPC": Color("f29a38"), "CarrotNPC": Color("f99432"), "BlueberryNPC": Color("637ed6"), "WatermelonNPC": Color("f35b6c")}
+const ROLE_COLORS: Array[Color] = [Color("f34758"), Color("7549ad"), Color("f29a38"), Color("f99432"), Color("637ed6"), Color("f35b6c")]
 const PIVOT := Vector3(0.0, 1.25, 0.0)
 var pieces: Array[Dictionary] = []
 var random := RandomNumberGenerator.new()
@@ -22,7 +22,7 @@ func _ready() -> void:
 func slice(actor: CharacterBody3D, attack_direction: Vector3) -> void:
 	var color: Color = COLORS.get(String(actor.name), Color("f34758"))
 	if actor.has_meta("role"):
-		color = ROLE_COLORS[clampi(int(actor.get_meta("role")), 0, 3)]
+		color = ROLE_COLORS[clampi(int(actor.get_meta("role")), 0, ROLE_COLORS.size() - 1)]
 	var meshes: Array[MeshInstance3D] = []
 	_collect_meshes(actor.visual, meshes)
 	var local_inverse: Transform3D = actor.visual.global_transform.affine_inverse()
@@ -34,7 +34,7 @@ func slice(actor: CharacterBody3D, attack_direction: Vector3) -> void:
 		fragment.global_transform = actor.visual.global_transform
 		fragment.global_position = actor.visual.to_global(PIVOT)
 		for source in meshes:
-			if source == actor.slash_visual:
+			if source == actor.slash_visual or source == actor.aim_visual:
 				continue
 			var relative: Transform3D = local_inverse * source.global_transform
 			var clone := MeshInstance3D.new()
@@ -46,12 +46,13 @@ func slice(actor: CharacterBody3D, attack_direction: Vector3) -> void:
 			var original: Material = source.get_active_material(0)
 			material.set_shader_parameter("skin_color", original.albedo_color if original is StandardMaterial3D else color)
 			material.set_shader_parameter("surface_roughness", original.roughness if original is StandardMaterial3D else 0.7)
+			material.set_shader_parameter("uses_vertex_color", original is StandardMaterial3D and original.vertex_color_use_as_albedo)
 			material.set_shader_parameter("slice_space", relative)
 			material.set_shader_parameter("half_sign", half)
 			clone.material_override = material
 			fragment.add_child(clone)
-			if String(source.name) in ["StrawberryBody", "EggplantBody", "CarrotBody", "DonutBody"]:
-				_add_cut_face(fragment, source, relative, color, half, String(source.name) == "DonutBody")
+			if String(source.name) in ["StrawberryBody", "EggplantBody", "PumpkinBody", "CarrotBody", "BlueberryBody", "WatermelonBody"]:
+				_add_cut_face(fragment, source, relative, color, half)
 		pieces.append({"node": fragment, "velocity": sideways * half * 3.4 + attack_direction * 0.65 + Vector3.UP * 3.6, "spin": Vector3(0.1, half * 0.45, half * 2.4), "age": 0.0, "floor": 0.52, "duration": 4.0, "half": true})
 	var blood := StandardMaterial3D.new()
 	blood.albedo_color = color
@@ -71,20 +72,18 @@ func slice(actor: CharacterBody3D, attack_direction: Vector3) -> void:
 
 
 func _collect_meshes(node: Node, meshes: Array[MeshInstance3D]) -> void:
-	if node is MeshInstance3D and node.visible and node.mesh:
+	if node is MeshInstance3D and node.is_visible_in_tree() and node.mesh:
 		meshes.append(node)
 	for child in node.get_children():
 		_collect_meshes(child, meshes)
 
 
-func _add_cut_face(fragment: Node3D, source: MeshInstance3D, relative: Transform3D, color: Color, half: float, donut: bool) -> void:
+func _add_cut_face(fragment: Node3D, source: MeshInstance3D, relative: Transform3D, color: Color, half: float) -> void:
 	var arrays: Array = source.mesh.surface_get_arrays(0)
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
 	var groups: Array[PackedVector2Array] = []
 	groups.append(PackedVector2Array())
-	if donut:
-		groups.append(PackedVector2Array())
 	var unique: Dictionary = {}
 	for triangle in range(0, indices.size(), 3):
 		for edge in range(3):
@@ -97,10 +96,9 @@ func _add_cut_face(fragment: Node3D, source: MeshInstance3D, relative: Transform
 			if key in unique:
 				continue
 			unique[key] = true
-			var group: int = 1 if donut and point.y > 1.49 else 0
-			var outline: PackedVector2Array = groups[group]
+			var outline: PackedVector2Array = groups[0]
 			outline.append(Vector2(point.y, point.z))
-			groups[group] = outline
+			groups[0] = outline
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color.lerp(Color("fff2cd"), 0.60)
 	material.roughness = 1.0

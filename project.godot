@@ -11,7 +11,8 @@ config_version=5
 [application]
 
 config/name="水果乱斗 · Boomerang Arena"
-config/description="选择自己与人机的食物角色，调整人机数量和简单、普通、困难三档难度；每局最后存活者保持1秒后得1分，全灭不加分，先到10分获胜。支持键盘、手机摇杆、跳斩和跳跃。"
+config/icon.ios="res://assets/icons/ios.png"
+config/description="选择自己与人机的食物角色、人机数量、难度和计分方式：每击杀一名对手得1分，或每局最后存活者保持1秒后得1分；先到10分获胜。支持键盘、手机摇杆、跳斩和跳跃。"
 run/main_scene="res://scenes/stone_arena.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
@@ -23,6 +24,7 @@ window/size/window_width_override=1440
 window/size/window_height_override=810
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+window/handheld/orientation.ios=6
 
 [input_devices]
 

@@ -60,7 +60,7 @@ func _verify() -> void:
 	var arena: Node3D = packed.instantiate() as Node3D
 	arena.verification_mode = true
 	# 此脚本只测移动和触控；战斗与人机攻击由 verify_combat.gd 独立覆盖。
-	for actor_name in ["EggplantNPC", "DonutNPC", "CarrotNPC"]:
+	for actor_name in ["EggplantNPC", "PumpkinNPC", "CarrotNPC", "BlueberryNPC", "WatermelonNPC"]:
 		arena.get_node(actor_name).melee_enabled = false
 		arena.get_node(actor_name).set_physics_process(false)
 		# 移动回归只测试摇杆、镜头和岩石；冻结的人机不能挡住测试路线。

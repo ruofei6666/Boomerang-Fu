@@ -25,15 +25,15 @@ func _frames(count: int) -> void:
 		await physics_frame
 
 
-func _start(role: int, difficulty: int) -> void:
+func _start(role: int, difficulty: int, count: int = 1) -> void:
 	arena.match_controller.return_to_lobby()
-	arena.match_controller.configure(1, difficulty, [0, role])
+	arena.match_controller.configure(count, difficulty, [0, role, role, role, role, role])
 	arena.match_controller.start_match()
 	player = arena.player
 	bot = arena.combat.actors[1]
 	for actor in arena.combat.actors:
 		actor.set_physics_process(false)
-	player.position = Vector3(30.0, 0.08, 30.0)
+		actor.position = Vector3(30.0 + 4.0 * actor.get_meta("seat"), 0.08, 30.0)
 	bot.position = lane_origin
 	bot.spawn_position = lane_origin
 	bot.jump_cooldown = 0.0
@@ -79,6 +79,140 @@ func _land() -> void:
 	bot.set_physics_process(false)
 
 
+func _wait_jump_ready() -> void:
+	# 用真实物理帧等原有冷却结束，保留闪避次数，不重置人机。
+	for actor in arena.combat.actors:
+		if actor != bot:
+			actor.set_physics_process(false)
+			actor.position = Vector3(30.0 + 4.0 * actor.get_meta("seat"), 0.08, 30.0)
+	bot.melee_enabled = false
+	bot.walking = false
+	bot.idle_time = 9999.0
+	bot.set_physics_process(true)
+	var elapsed: int = 0
+	while bot.jump_cooldown > 0.0 and elapsed < 240:
+		await _frames(1)
+		elapsed += 1
+	bot.set_physics_process(false)
+	bot.melee_enabled = true
+
+
+func _stage_incoming_slash(attacker: CharacterBody3D = null) -> void:
+	if attacker == null:
+		attacker = player
+	bot.set_physics_process(false)
+	for actor in arena.combat.actors:
+		if actor != bot:
+			actor.set_physics_process(false)
+			actor.position = Vector3(30.0 + 4.0 * actor.get_meta("seat"), 0.08, 30.0)
+	attacker.reset_character()
+	if attacker.is_in_group("wanderers"):
+		attacker.melee_enabled = false
+	bot.position = lane_origin + lane_direction * 6.0
+	bot.velocity = Vector3.ZERO
+	attacker.position = bot.position - lane_direction * 3.8
+	attacker.visual.rotation.y = atan2(lane_direction.x, lane_direction.z)
+	await _frames(2)
+	attacker.begin_attack()
+
+
+func _verify_dodge_limit() -> void:
+	for difficulty in range(3):
+		# 两名攻击者使用相同草莓模型，次数必须按参赛者而非模型种类区分。
+		await _start(0, difficulty, 2)
+		var other: CharacterBody3D = arena.combat.actors[2]
+		_check(player.get_meta("role") == other.get_meta("role"), "Difficulty %d same-model opponents remain distinct participants" % difficulty)
+		_check(not bot._begin_ai_jump(lane_direction, "dodge") and bot.dodges_by_opponent.is_empty(), "Difficulty %d a dodge without an attacker cannot start or consume an allowance" % difficulty)
+		for attacker in [player, other]:
+			_check(bot.dodge_count_against(attacker) == 0, "Difficulty %d starts with a separate allowance against %s" % [difficulty, attacker.name])
+			for attempt in range(2):
+				await _wait_jump_ready()
+				await _stage_incoming_slash(attacker)
+				# 追击目标故意与攻击者不同，闪避应记在实际来刀者身上。
+				bot.target_actor = other if attacker == player else player
+				bot.target_timer = 9999.0
+				var before: int = bot.jump_id
+				attacker.set_physics_process(true)
+				bot.set_physics_process(true)
+				var elapsed: int = 0
+				while bot.jump_id == before and bot.alive and elapsed < 15:
+					await _frames(1)
+					elapsed += 1
+				_check(bot.alive and bot.jump_id == before + 1 and bot.last_jump_reason == "dodge" and bot.dodge_count_against(attacker) == attempt + 1, "Difficulty %d performs real dodge %d against %s" % [difficulty, attempt + 1, attacker.name])
+				if attempt == 0:
+					var attack_before: int = bot.attack_id
+					bot.begin_attack()
+					_check(bot.attack_id == attack_before and bot.dodge_count_against(attacker) == 1, "Difficulty %d rejected airborne attack preserves the allowance against %s" % [difficulty, attacker.name])
+				await _land()
+				_check(bot.alive and bot.dodge_count_against(attacker) == attempt + 1, "Difficulty %d landing preserves dodge count %d against %s" % [difficulty, attempt + 1, attacker.name])
+			await _wait_jump_ready()
+			await _stage_incoming_slash(attacker)
+			var before: int = bot.jump_id
+			_check(not bot._try_dodge_jump(bot.dodge_delay + 0.001) and bot.jump_id == before and bot.dodge_count_against(attacker) == 2, "Difficulty %d rejects a third incoming-slash dodge against %s" % [difficulty, attacker.name])
+			_check(not bot._begin_ai_jump(-lane_direction, "dodge", attacker) and bot.jump_id == before, "Difficulty %d direct AI jump also rejects a third dodge against %s" % [difficulty, attacker.name])
+		await _wait_jump_ready()
+		_check(bot.jump_cooldown == 0.0 and bot.dodge_count_against(player) == 2 and bot.dodge_count_against(other) == 2, "Difficulty %d cooldown cannot restore either opponent's allowance" % difficulty)
+		await _stage_incoming_slash()
+		var before: int = bot.jump_id
+		bot.target_actor = other
+		_check(not bot._try_dodge_jump(bot.dodge_delay + 0.001) and bot.jump_id == before and bot.dodge_count_against(player) == 2, "Difficulty %d switching targets and back cannot restore an exhausted allowance" % difficulty)
+		bot.round_active = false
+		bot.begin_attack()
+		_check(bot.dodge_count_against(player) == 2 and bot.dodge_count_against(other) == 2, "Difficulty %d paused attack preserves both counts" % difficulty)
+		bot.round_active = true
+		player.reset_character()
+		player.position = lane_origin + lane_direction * 12.0
+		bot.position = lane_origin
+		bot.target_actor = player
+		bot.target_timer = 0.0
+		bot.jump_reaction = 0.0
+		await _frames(2)
+		bot.set_physics_process(true)
+		var elapsed: int = 0
+		while bot.jump_id == before and bot.alive and elapsed < 120:
+			await _frames(1)
+			elapsed += 1
+		_check(bot.jump_id == before + 1 and bot.last_jump_reason == "chase" and bot.dodge_count_against(player) == 2 and bot.dodge_count_against(other) == 2, "Difficulty %d chase-jump preserves both exhausted allowances" % difficulty)
+		await _land()
+		await _wait_jump_ready()
+		player.reset_character()
+		player.position = Vector3(30.0, 0.08, 30.0)
+		var attack_before: int = bot.attack_id
+		var requested: bool = bot.request_attack()
+		arena.combat._physics_process(1.0 / 60.0)
+		_check(requested and bot.attack_id == attack_before + 1 and bot.attack_state == "hop" and bot.dodge_count_against(player) == 2 and bot.dodge_count_against(other) == 2, "Difficulty %d a real combat-started slash cannot restore either allowance" % difficulty)
+		bot.melee_enabled = false
+		bot.idle_time = 9999.0
+		bot.walking = false
+		bot.set_physics_process(true)
+		await _frames(40)
+		bot.set_physics_process(false)
+		bot.melee_enabled = true
+		await _stage_incoming_slash(other)
+		before = bot.jump_id
+		_check(not bot._try_dodge_jump(bot.dodge_delay + 0.001) and bot.jump_id == before and bot.dodge_count_against(other) == 2, "Difficulty %d still refuses a third dodge after finishing its own slash" % difficulty)
+		bot.reset_character()
+		_check(bot.dodge_count_against(player) == 2 and bot.dodge_count_against(other) == 2, "Difficulty %d character repositioning within the round preserves both counts" % difficulty)
+		arena.match_controller._finish_round(-1)
+		arena.match_controller.next_round()
+		for actor in arena.combat.actors:
+			actor.set_physics_process(false)
+		_check(bot.dodges_by_opponent.is_empty() and bot.attack_state == "idle" and bot.alive, "Difficulty %d next round clears every opponent's count" % difficulty)
+		await _wait_jump_ready()
+		await _stage_incoming_slash()
+		before = bot.jump_id
+		player.set_physics_process(true)
+		bot.set_physics_process(true)
+		elapsed = 0
+		while bot.jump_id == before and bot.alive and elapsed < 15:
+			await _frames(1)
+			elapsed += 1
+		_check(bot.alive and bot.jump_id == before + 1 and bot.last_jump_reason == "dodge" and bot.dodge_count_against(player) == 1 and bot.dodge_count_against(other) == 0, "Difficulty %d can dodge again next round without charging the other opponent" % difficulty)
+		arena.match_controller._finish_round(-1)
+		arena.match_controller.next_round()
+		_check(bot.dodges_by_opponent.is_empty() and bot.attack_state == "idle" and bot.alive, "Difficulty %d next round also clears counts and motion during a dodge jump" % difficulty)
+
+
 func _verify() -> void:
 	arena = load("res://scenes/stone_arena.tscn").instantiate()
 	root.add_child(arena)
@@ -110,7 +244,7 @@ func _verify() -> void:
 		_check(traveled.distance_to(lane_direction * 5.70) < 0.005, "Role %d NPC travels exactly 5.70 in the locked direction" % role)
 		_check(bot.attack_state == "idle" and bot.velocity.is_zero_approx() and is_zero_approx(bot.visual.position.y) and bot.attack_id == attack_id and arena.combat.sound_counts.slash == slash_count and player.alive, "Role %d NPC lands without swinging or dealing damage" % role)
 		bot.reset_character()
-		_check(bot.jump_time == 0.0 and bot.attack_state == "idle" and bot.position.is_equal_approx(bot.spawn_position) and bot.last_jump_reason.is_empty(), "Role %d NPC reset clears jump motion and AI decisions" % role)
+		_check(bot.jump_time == 0.0 and bot.attack_state == "idle" and bot.position.is_equal_approx(bot.spawn_position) and bot.last_jump_reason.is_empty() and bot.dodges_by_opponent.is_empty(), "Role %d NPC reset clears jump motion and AI decisions" % role)
 	var intervals: Array[float] = []
 	var dodge_delays: Array[float] = []
 	for difficulty in range(3):
@@ -150,6 +284,7 @@ func _verify() -> void:
 		_check(bot.alive and player.alive and bot.attack_state == "idle", "Difficulty %d escapes the slash through movement and safely lands" % difficulty)
 		samples[difficulty]["dodge_reaction_frames"] = elapsed
 	_check(intervals[0] > intervals[1] and intervals[1] > intervals[2] and dodge_delays[0] > dodge_delays[1] and dodge_delays[1] > dodge_delays[2], "Higher difficulty jumps more often and reacts faster to danger")
+	await _verify_dodge_limit()
 	await _start(1, 2)
 	bot.position = lane_origin + lane_direction * 6.0
 	player.position = bot.position - lane_direction * 3.8
@@ -171,6 +306,7 @@ func _verify() -> void:
 	wall.position = lane_origin + lane_direction * 2.8 + Vector3.UP * 1.5
 	await _frames(2)
 	_check(not bot._can_jump(lane_direction) and not bot._begin_ai_jump(lane_direction, "chase"), "AI checks the full route and rejects a jump through solid obstacles")
+	_check(not bot._begin_ai_jump(lane_direction, "dodge", player) and bot.dodges_by_opponent.is_empty(), "A blocked dodge does not consume an opponent's allowance")
 	bot.visual.rotation.y = atan2(lane_direction.x, lane_direction.z)
 	bot.request_jump()
 	bot.set_physics_process(true)
@@ -195,8 +331,10 @@ func _verify() -> void:
 	bot.position = Vector3(16.0, 0.08, 0.0)
 	bot.jump_cooldown = 0.0
 	_check(not bot._can_jump(Vector3.RIGHT) and not bot._begin_ai_jump(Vector3.RIGHT, "chase"), "AI rejects a landing beyond the arena boundary")
+	_check(not bot._begin_ai_jump(Vector3.RIGHT, "dodge", player) and bot.dodges_by_opponent.is_empty(), "An out-of-bounds dodge does not consume an opponent's allowance")
 	bot.round_active = false
 	_check(not bot.request_jump(), "A paused round rejects NPC jumps")
+	_check(not bot._begin_ai_jump(Vector3.LEFT, "dodge", player) and bot.dodges_by_opponent.is_empty(), "A paused dodge does not consume an opponent's allowance")
 	bot.round_active = true
 	bot.attack_requested = true
 	_check(not bot.request_jump(), "An already requested slash cannot be replaced by an NPC jump")

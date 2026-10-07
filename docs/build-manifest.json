@@ -4,8 +4,8 @@
   "files": [
     {
       "path": "index.html",
-      "bytes": 2654,
-      "sha256": "684caefe75b3fc83b0b3966152fa53e8174cfa7a10b6e2c3f568fa30a851fcfe"
+      "bytes": 2722,
+      "sha256": "a1bc122832f19653c5bbc9de79e286e47eeeeafec3f40970577d938ab405621a"
     },
     {
       "path": "index.js",
@@ -19,8 +19,8 @@
     },
     {
       "path": "index.pck",
-      "bytes": 913624,
-      "sha256": "ab961415de91dc8a3b7b981f63d1d3501b82b870f9261f852f18ff1b003463f3"
+      "bytes": 1856532,
+      "sha256": "935d720bdb62ad87188a97ba585ac221f12633dbc5caf5e9e5963ba69994e7cf"
     },
     {
       "path": "index.png",

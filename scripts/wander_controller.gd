@@ -5,6 +5,8 @@ extends "res://scripts/food_character_controller.gd"
 @export var wander_radius: float = 8.0
 @export var wander_bounds := Rect2(-15.5, -10.5, 31.0, 21.0)
 
+const MAX_DODGES_PER_OPPONENT: int = 2
+
 var random := RandomNumberGenerator.new()
 var destination: Vector3
 var walking: bool = false
@@ -30,6 +32,11 @@ var dodge_reaction: float = 0.0
 var jump_interval: float = 2.0
 var dodge_delay: float = 0.05
 var last_jump_reason: String = ""
+# 按角色实例计数，同一模型的不同参赛者也各有两次额度；仅下一小局清零。
+var dodges_by_opponent: Dictionary[int, int] = {}
+var ranged_reaction: float = 0.0
+var ranged_cooldown: float = 0.0
+var ranged_aim_time: float = 0.0
 
 
 func _ready() -> void:
@@ -46,6 +53,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if round_active and alive:
 		jump_cooldown = maxf(0.0, jump_cooldown - delta)
+		ranged_cooldown = maxf(0.0, ranged_cooldown - delta)
 	super._physics_process(delta)
 
 
@@ -53,9 +61,13 @@ func movement_direction(delta: float) -> Vector3:
 	melee_cooldown = maxf(0.0, melee_cooldown - delta)
 	if arena_ai and melee_enabled and is_instance_valid(combat):
 		return _arena_direction(delta)
+	if melee_enabled and not has_boomerang and is_instance_valid(combat):
+		return _retrieve_boomerang(delta)
 	if melee_enabled and is_instance_valid(combat) and combat.player.alive:
 		var to_player: Vector3 = combat.player.global_position - global_position
 		to_player.y = 0.0
+		if _try_ranged_attack(combat.player, to_player, delta):
+			return Vector3.ZERO
 		if to_player.length() < 2.65 and to_player.length() > 0.1 and melee_cooldown <= 0.0 and combat.clear_path(self, combat.player):
 			melee_reaction += delta
 			visual.rotation.y = lerp_angle(visual.rotation.y, atan2(to_player.x, to_player.z), 1.0 - exp(-15.0 * delta))
@@ -117,6 +129,7 @@ func _arena_direction(delta: float) -> Vector3:
 		target_timer = [0.55, 0.30, 0.16][ai_difficulty]
 		if previous != target_actor:
 			melee_reaction = 0.0
+			ranged_reaction = 0.0
 			jump_reaction = 0.0
 			path_timer = 0.0
 	if not is_instance_valid(target_actor):
@@ -126,6 +139,8 @@ func _arena_direction(delta: float) -> Vector3:
 		return Vector3.ZERO
 	if _try_dodge_jump(delta):
 		return Vector3.ZERO
+	if not has_boomerang:
+		return _retrieve_boomerang(delta)
 	var offset: Vector3 = target_actor.global_position - global_position
 	offset.y = 0.0
 	var distance: float = offset.length()
@@ -137,6 +152,8 @@ func _arena_direction(delta: float) -> Vector3:
 			return Vector3.ZERO
 	else:
 		jump_reaction = 0.0
+	if jump_reaction <= 0.0 and _try_ranged_attack(target_actor, offset, delta):
+		return Vector3.ZERO
 	if distance < 2.75 and distance > 0.05 and clear:
 		walking = false
 		visual.rotation.y = lerp_angle(visual.rotation.y, atan2(offset.x, offset.z), 1.0 - exp(-15.0 * delta))
@@ -151,11 +168,17 @@ func _arena_direction(delta: float) -> Vector3:
 		return Vector3.ZERO
 	melee_reaction = 0.0
 	walking = true
+	return _navigate_toward(target_actor.global_position, clear)
+
+
+func _navigate_toward(destination_point: Vector3, clear: bool) -> Vector3:
+	var offset: Vector3 = destination_point - global_position
+	offset.y = 0.0
 	var direction: Vector3 = offset.normalized()
 	if not clear or test_move(global_transform, direction * 1.15):
 		if is_instance_valid(combat.navigation):
 			if path_timer <= 0.0:
-				path = combat.navigation.get_point_path(combat.navigation_cell(global_position), combat.navigation_cell(target_actor.global_position))
+				path = combat.navigation.get_point_path(combat.navigation_cell(global_position), combat.navigation_cell(destination_point))
 				path_index = 1 if path.size() > 1 else 0
 				path_timer = 0.40
 			while path_index < path.size():
@@ -180,6 +203,57 @@ func _arena_direction(delta: float) -> Vector3:
 	return direction
 
 
+func _try_ranged_attack(target: CharacterBody3D, offset: Vector3, delta: float) -> bool:
+	var distance: float = offset.length()
+	if not has_boomerang or ranged_cooldown > 0.0 or distance < 3.3 or distance > 18.0 or not combat.clear_path(self, target):
+		ranged_reaction = 0.0
+		return false
+	target_actor = target
+	walking = false
+	ranged_reaction += delta
+	visual.rotation.y = atan2(offset.x, offset.z)
+	if ranged_reaction >= reaction_delay:
+		ranged_aim_time = 0.0
+		request_throw()
+		ranged_reaction = 0.0
+	return true
+
+
+func aim_direction(_delta: float) -> Vector3:
+	if not is_instance_valid(target_actor) or not target_actor.alive:
+		return throw_direction
+	var distance: float = global_position.distance_to(target_actor.global_position)
+	# 根据飞行时间预判走动；较高难度的提前量更准确。
+	var lead: float = distance / 24.0 * [0.35, 0.65, 0.9][ai_difficulty]
+	var predicted: Vector3 = target_actor.global_position + target_actor.velocity * lead
+	return predicted - global_position
+
+
+func _process_aim(delta: float) -> void:
+	super._process_aim(delta)
+	if not is_instance_valid(target_actor) or not target_actor.alive or not combat.clear_path(self, target_actor):
+		cancel_throw()
+		ranged_reaction = 0.0
+		return
+	ranged_aim_time += delta
+	if ranged_aim_time >= [0.56, 0.38, 0.22][ai_difficulty]:
+		ranged_aim_time = 0.0
+		release_throw()
+		ranged_cooldown = attack_interval + 0.8
+
+
+func _retrieve_boomerang(delta: float) -> Vector3:
+	melee_reaction = 0.0
+	ranged_reaction = 0.0
+	jump_reaction = 0.0
+	if not is_instance_valid(thrown_boomerang):
+		walking = false
+		return Vector3.ZERO
+	path_timer -= delta
+	walking = true
+	return _navigate_toward(thrown_boomerang.global_position, combat.clear_point_path(self, thrown_boomerang.global_position))
+
+
 func _can_jump(direction: Vector3) -> bool:
 	if direction.is_zero_approx():
 		return false
@@ -190,7 +264,18 @@ func _can_jump(direction: Vector3) -> bool:
 	return not test_move(global_transform, direction * JUMP_DISTANCE)
 
 
-func _begin_ai_jump(direction: Vector3, reason: String) -> bool:
+func dodge_count_against(opponent: CharacterBody3D) -> int:
+	if not is_instance_valid(opponent):
+		return 0
+	return dodges_by_opponent.get(opponent.get_instance_id(), 0)
+
+
+func _begin_ai_jump(direction: Vector3, reason: String, opponent: CharacterBody3D = null) -> bool:
+	if reason == "dodge":
+		if not is_instance_valid(opponent) or opponent == self or not opponent.alive:
+			return false
+		if dodge_count_against(opponent) >= MAX_DODGES_PER_OPPONENT:
+			return false
 	if jump_cooldown > 0.0 or not _can_jump(direction):
 		return false
 	visual.rotation.y = atan2(direction.x, direction.z)
@@ -203,6 +288,8 @@ func _begin_ai_jump(direction: Vector3, reason: String) -> bool:
 	walking = false
 	path_timer = 0.0
 	last_jump_reason = reason
+	if reason == "dodge":
+		dodges_by_opponent[opponent.get_instance_id()] = dodge_count_against(opponent) + 1
 	return true
 
 
@@ -214,6 +301,8 @@ func _try_dodge_jump(delta: float) -> bool:
 	var nearest: float = HOP_DISTANCE + combat.RANGE + 0.5
 	for actor in combat.actors:
 		if actor == self or not actor.alive or actor.attack_state not in ["hop", "swing"]:
+			continue
+		if dodge_count_against(actor) >= MAX_DODGES_PER_OPPONENT:
 			continue
 		var away: Vector3 = global_position - actor.global_position
 		away.y = 0.0
@@ -232,7 +321,7 @@ func _try_dodge_jump(delta: float) -> bool:
 	away = away.normalized()
 	var side: Vector3 = away.rotated(Vector3.UP, PI * 0.5 * evasion_side)
 	for direction in [side, -side, away, away.rotated(Vector3.UP, PI * 0.25), away.rotated(Vector3.UP, -PI * 0.25)]:
-		if _begin_ai_jump(direction, "dodge"):
+		if _begin_ai_jump(direction, "dodge", threat):
 			return true
 	return false
 
@@ -283,6 +372,9 @@ func reset_character() -> void:
 	super.reset_character()
 	melee_reaction = 0.0
 	melee_cooldown = 0.0
+	ranged_reaction = 0.0
+	ranged_cooldown = 0.0
+	ranged_aim_time = 0.0
 	jump_cooldown = random.randf_range(0.25, 0.70)
 	jump_reaction = 0.0
 	dodge_reaction = 0.0
@@ -295,3 +387,8 @@ func reset_character() -> void:
 	evasion_side = -1.0 if random.randf() < 0.5 else 1.0
 	destination = spawn_position
 	_rest()
+
+
+func reset_round_dodges() -> void:
+	# 小局重开才恢复额度，地图跌落后的角色复位仍保留本局次数。
+	dodges_by_opponent.clear()

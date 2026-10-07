@@ -5,7 +5,7 @@ const CAMERA_SCRIPT = preload("res://scripts/camera_controller.gd")
 const ARENA_SCRIPT = preload("res://scripts/arena.gd")
 const INTERFACE_SCRIPT = preload("res://scripts/interface.gd")
 const PLAYER_SCENE = preload("res://scenes/strawberry_player.tscn")
-const WANDER_SCENES = [preload("res://scenes/eggplant_npc.tscn"), preload("res://scenes/donut_npc.tscn"), preload("res://scenes/carrot_npc.tscn")]
+const WANDER_SCENES = [preload("res://scenes/eggplant_npc.tscn"), preload("res://scenes/pumpkin_npc.tscn"), preload("res://scenes/carrot_npc.tscn"), preload("res://scenes/blueberry_npc.tscn"), preload("res://scenes/watermelon_npc.tscn")]
 
 const GROUND_COLOR := Color("d4f887")
 const CAP_COLOR := Color("b5e89a")
@@ -40,7 +40,7 @@ func build_scene() -> Node3D:
 	var player: CharacterBody3D = PLAYER_SCENE.instantiate() as CharacterBody3D
 	player.position = Vector3(0.0, 0.08, 3.0)
 	arena.add_child(player)
-	var starts: Array[Vector3] = [Vector3(-2.9, 0.08, 1.25), Vector3(2.75, 0.08, 4.4), Vector3(0.75, 0.08, -0.55)]
+	var starts: Array[Vector3] = [Vector3(-2.9, 0.08, 1.25), Vector3(2.75, 0.08, 4.4), Vector3(0.75, 0.08, -0.55), Vector3(-5.8, 0.08, 4.4), Vector3(5.8, 0.08, 4.4)]
 	for index in range(WANDER_SCENES.size()):
 		var actor: CharacterBody3D = WANDER_SCENES[index].instantiate() as CharacterBody3D
 		actor.position = starts[index]
