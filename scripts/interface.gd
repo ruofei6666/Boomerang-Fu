@@ -48,9 +48,6 @@ var score_styles: Array[StyleBoxFlat] = []
 func _ready() -> void:
 	root.theme = root.theme.duplicate() as Theme
 	root.theme.default_font = UI_FONT
-	$Root/TopRight/Reset.pressed.connect(camera_rig.reset_view)
-	$Root/TopRight/Reset.focus_mode = Control.FOCUS_NONE
-	$Root/TopRight/Reset.text = "跟随视角 R"
 	$Root/MapTitle.text = "水果乱斗  /  BOOMERANG ARENA"
 	roles_label = Label.new()
 	roles_label.name = "CharacterRoles"
@@ -67,7 +64,9 @@ func _ready() -> void:
 	respawn_button.text = "重新开始"
 	respawn_button.focus_mode = Control.FOCUS_NONE
 	respawn_button.pressed.connect(_respawn)
-	var style: StyleBoxFlat = $Root/TopRight/Reset.get_theme_stylebox("normal").duplicate() as StyleBoxFlat
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.96, 1.0, 0.88, 0.84)
+	style.set_corner_radius_all(8)
 	respawn_button.add_theme_stylebox_override("normal", style)
 	respawn_button.add_theme_color_override("font_color", Color("3a5948"))
 	root.add_child(respawn_button)
@@ -116,16 +115,14 @@ func _layout_controls() -> void:
 	zoom_label.custom_minimum_size = Vector2(46.0, 0.0) * unit
 	zoom_label.add_theme_font_size_override("font_size", roundi(14.0 * unit))
 	top.add_theme_constant_override("separation", roundi(14.0 * unit))
-	$Root/TopRight/Reset.custom_minimum_size = Vector2(116.0, 42.0) * unit
-	$Root/TopRight/Reset.add_theme_font_size_override("font_size", roundi(14.0 * unit))
 	respawn_button.add_theme_font_size_override("font_size", roundi(15.0 * unit))
 	var panel: PanelContainer = $Root/CameraHints
 	var hints: Label = $Root/CameraHints/Hints
 	hints.text = "摇杆走动 · 右侧砍 / 跳" if mobile else "WASD / 方向键 走动   ·   J 跳斩   ·   K 跳跃   ·   滚轮缩放   ·   Q / E 转镜头"
 	hints.add_theme_font_size_override("font_size", roundi(12.0 * unit))
 	# 先更新字体和最小尺寸，再调整容器，横竖屏切换不会保留旧的高度。
-	top.size = Vector2(116.0 if mobile else 200.0, 42.0) * unit
-	top.position = Vector2(logical.x - (136.0 if mobile else 220.0) * unit, 16.0 * unit)
+	top.size = Vector2(46.0, 42.0) * unit
+	top.position = Vector2(logical.x - 66.0 * unit, 16.0 * unit)
 	respawn_button.size = Vector2(116.0, 44.0) * unit
 	respawn_button.position = Vector2(logical.x - 136.0 * unit, logical.y - 68.0 * unit)
 	var attack_size: float = (100.0 if mobile else 106.0) * unit

@@ -127,6 +127,8 @@ func _process(delta: float) -> void:
 		"stick_center": [center.x, center.y],
 		"stick_radius": stick.radius * screen_ratio.x,
 		"camera": [camera_rig.position.x, camera_rig.position.z],
+		"camera_size": camera_rig.camera.size,
+		"zoom_percent": camera_rig.view_size(camera_rig.initial_size) / camera_rig.camera.size * 100.0,
 		"yaw": camera_rig.yaw,
 		"alive": player.alive,
 		"attack_state": player.attack_state,

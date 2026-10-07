@@ -344,7 +344,7 @@ func _build_interface(arena: Node3D) -> void:
 	top_right.name = "TopRight"
 	top_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_right.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	top_right.offset_left = -215.0
+	top_right.offset_left = -70.0
 	top_right.offset_right = -24.0
 	top_right.offset_top = 22.0
 	top_right.offset_bottom = 56.0
@@ -357,22 +357,6 @@ func _build_interface(arena: Node3D) -> void:
 	zoom.custom_minimum_size.x = 46.0
 	zoom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_right.add_child(zoom)
-	var reset := Button.new()
-	reset.name = "Reset"
-	reset.text = "复位视角  R"
-	reset.custom_minimum_size = Vector2(126.0, 34.0)
-	var button_style := StyleBoxFlat.new()
-	button_style.bg_color = Color(0.96, 1.0, 0.88, 0.84)
-	button_style.set_corner_radius_all(8)
-	reset.add_theme_stylebox_override("normal", button_style)
-	var hover: StyleBoxFlat = button_style.duplicate() as StyleBoxFlat
-	hover.bg_color = Color("f9ffeb")
-	reset.add_theme_stylebox_override("hover", hover)
-	reset.add_theme_stylebox_override("pressed", hover)
-	reset.add_theme_color_override("font_color", Color("3a5948"))
-	reset.add_theme_color_override("font_hover_color", Color("243a31"))
-	reset.add_theme_color_override("font_pressed_color", Color("243a31"))
-	top_right.add_child(reset)
 
 
 func _material(color: Color) -> StandardMaterial3D:

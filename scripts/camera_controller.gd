@@ -3,6 +3,7 @@ extends Node3D
 
 @export var initial_size: float = 40.0 / 1.23
 @export var overview_width: float = 50.0 / 1.23
+@export_range(100.0, 200.0, 1.0) var mobile_zoom_percent: float = 120.0
 @export var min_size: float = 11.0
 @export var max_size: float = 72.0
 @export var move_speed: float = 12.0
@@ -20,13 +21,17 @@ var drag_button: int = MOUSE_BUTTON_NONE
 var hud: CanvasLayer
 var follow_target: Node3D
 var following: bool = true
+var mobile_view: bool = false
 
 
 func _ready() -> void:
-	desired_size = initial_size
+	mobile_view = OS.has_feature("android") or OS.has_feature("ios")
+	if OS.has_feature("web"):
+		mobile_view = mobile_view or bool(JavaScriptBridge.eval("navigator.maxTouchPoints > 0", true))
+	desired_size = default_zoom_size()
 	yaw = deg_to_rad(initial_yaw_degrees)
 	position = desired_center
-	camera.size = view_size(initial_size)
+	camera.size = view_size(desired_size)
 	_apply_orientation()
 	get_viewport().size_changed.connect(_resize_view)
 	hud = get_parent().get_node_or_null("Interface") as CanvasLayer
@@ -124,6 +129,10 @@ func ground_position(screen_position: Vector2) -> Vector3:
 	return hit as Vector3 if hit != null else position
 
 
+func default_zoom_size() -> float:
+	return initial_size * 100.0 / mobile_zoom_percent if mobile_view else initial_size
+
+
 func view_size(zoom_size: float) -> float:
 	# 竖屏保留与横屏相近的地图覆盖范围。
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
@@ -154,7 +163,7 @@ func zoom_at(screen_position: Vector2, factor: float) -> void:
 func reset_view() -> void:
 	following = true
 	desired_center = Vector3(follow_target.global_position.x, 0.0, follow_target.global_position.z) if is_instance_valid(follow_target) else Vector3(0.0, 0.0, 0.7)
-	desired_size = initial_size
+	desired_size = default_zoom_size()
 	yaw = deg_to_rad(initial_yaw_degrees)
 	_end_drag()
 
